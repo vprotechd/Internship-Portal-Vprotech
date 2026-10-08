@@ -15,15 +15,18 @@ import axios from 'axios';
 */
 
 const getApiBaseUrl = () => {
-  // If VITE_API_URL is defined, always use it.
+  // If VITE_API_URL is defined, use it.
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL.replace(/\/+$/, '');
   }
 
   // Local development
   if (
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1'
+    typeof window !== 'undefined' &&
+    (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1'
+    )
   ) {
     return 'http://localhost:5000/api';
   }
@@ -42,10 +45,14 @@ const API_BASE_URL = getApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+
+  // Required for cookie-based authentication
   withCredentials: true,
+
   headers: {
     'Content-Type': 'application/json',
   },
+
   timeout: 30000,
 });
 
@@ -74,6 +81,7 @@ api.interceptors.response.use(
   (response) => {
     return response;
   },
+
   (error) => {
     /*
     |--------------------------------------------------------------------------
@@ -129,7 +137,11 @@ export const msg = (error) => {
 
   if (Array.isArray(error.response?.data?.errors)) {
     return error.response.data.errors
-      .map((item) => item.message || item)
+      .map((item) =>
+        typeof item === 'object'
+          ? item.message || JSON.stringify(item)
+          : item
+      )
       .join(', ');
   }
 
@@ -148,7 +160,7 @@ export const msg = (error) => {
 
 /*
 |--------------------------------------------------------------------------
-| Export
+| Export Axios Instance
 |--------------------------------------------------------------------------
 */
 
