@@ -15,19 +15,23 @@ import axios from 'axios';
 */
 
 const getApiBaseUrl = () => {
-  // If VITE_API_URL is defined, use it.
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL.replace(/\/+$/, '');
+  const configuredUrl = import.meta.env.VITE_API_URL?.trim();
+  const isLocal =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1');
+
+  if (configuredUrl) {
+    const normalizedUrl = configuredUrl.replace(/\/+$/, '');
+    if (/^https?:\/\//i.test(normalizedUrl) || isLocal) return normalizedUrl;
+
+    return new URL(
+      normalizedUrl,
+      'https://internship-portal-vprotech1.onrender.com/'
+    ).toString().replace(/\/+$/, '');
   }
 
-  // Local development
-  if (
-    typeof window !== 'undefined' &&
-    (
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1'
-    )
-  ) {
+  if (isLocal) {
     return 'http://localhost:5000/api';
   }
 

@@ -17,8 +17,18 @@ export function AuthProvider({ children }) {
 
   const login = async (form) => {
     const { data } = await api.post('/auth/login', form);
-    setUser(data.user);
-    return data.user;
+    const authenticatedUser = data?.user;
+    if (
+      !authenticatedUser ||
+      !['admin', 'student'].includes(authenticatedUser.role)
+    ) {
+      throw new Error(
+        'The login service returned an invalid response. Check the frontend API URL in Render settings.'
+      );
+    }
+
+    setUser(authenticatedUser);
+    return authenticatedUser;
   };
 
   const register = async (form) => {
