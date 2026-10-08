@@ -1195,6 +1195,7 @@ function ResultsTab() {
   });
 
   const [review, setReview] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(
     () =>
@@ -1215,9 +1216,31 @@ function ResultsTab() {
     load();
   }, [load]);
 
-  const exportUrl = `/api/admin/results/export.csv${
-    filter ? `?testId=${filter}` : ''
-  }`;
+  const exportResults = async () => {
+    setExporting(true);
+
+    try {
+      const response = await api.get('/admin/results/export.csv', {
+        params: {
+          testId: filter || undefined,
+        },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+
+      link.href = url;
+      link.download = 'results.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
+    } catch (e) {
+      toast(msg(e), 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -1252,13 +1275,15 @@ function ResultsTab() {
           }}
         />
 
-        <a
+        <button
+          type="button"
           className={`${btn} flex items-center gap-1`}
-          href={exportUrl}
+          onClick={exportResults}
+          disabled={exporting}
         >
           <Download size={14} />
-          Export CSV
-        </a>
+          {exporting ? 'Exporting...' : 'Export CSV'}
+        </button>
       </div>
 
       <div className="text-sm text-slate-600">
