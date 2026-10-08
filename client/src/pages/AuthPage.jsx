@@ -48,6 +48,40 @@ const benefits = [
   },
 ];
 
+function AuthToast({ toast, onDismiss }) {
+  useEffect(() => {
+    if (!toast) return undefined;
+
+    const timeout = setTimeout(onDismiss, 4000);
+    return () => clearTimeout(timeout);
+  }, [toast, onDismiss]);
+
+  if (!toast) return null;
+
+  const isError = toast.type === 'error';
+
+  return (
+    <div
+      role={isError ? 'alert' : 'status'}
+      className={`fixed right-4 top-4 z-50 flex w-[min(24rem,calc(100%-2rem))] items-start gap-3 rounded-xl border p-4 shadow-lg ${
+        isError
+          ? 'border-red-200 bg-red-50 text-red-800'
+          : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+      }`}
+    >
+      <span className="flex-1 text-sm font-medium">{toast.message}</span>
+      <button
+        type="button"
+        aria-label="Dismiss notification"
+        className="text-lg leading-4 opacity-70 hover:opacity-100"
+        onClick={onDismiss}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 export default function AuthPage({ initialMode = 'login' }) {
   const { login, register } = useAuth();
   const nav = useNavigate();
@@ -60,8 +94,7 @@ export default function AuthPage({ initialMode = 'login' }) {
   );
 
   const [form, setForm] = useState({});
-  const [err, setErr] = useState('');
-  const [notice, setNotice] = useState('');
+  const [toast, setToast] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
@@ -73,8 +106,6 @@ export default function AuthPage({ initialMode = 'login' }) {
       [key]: e.target.value,
     }));
 
-    if (err) setErr('');
-    if (notice) setNotice('');
   };
 
   useEffect(() => {
@@ -89,23 +120,24 @@ export default function AuthPage({ initialMode = 'login' }) {
     e.preventDefault();
 
     setBusy(true);
-    setErr('');
-    setNotice('');
+    setToast(null);
 
     try {
       if (mode === 'register') {
         if (form.password !== form.confirmPassword) {
-          setErr('Passwords do not match.');
+          setToast({ message: 'Passwords do not match.', type: 'error' });
           setBusy(false);
           return;
         }
 
         const data = await register(form);
 
-        setNotice(
-          data?.message ||
-            'Registration successful. Please login to continue.'
-        );
+        setToast({
+          message:
+            data?.message ||
+            'Registration successful. Please login to continue.',
+          type: 'success',
+        });
 
         setTimeout(() => {
           nav('/login', { replace: true });
@@ -123,7 +155,7 @@ export default function AuthPage({ initialMode = 'login' }) {
         );
       }
     } catch (error) {
-      setErr(msg(error));
+      setToast({ message: msg(error), type: 'error' });
     } finally {
       setBusy(false);
     }
@@ -133,8 +165,7 @@ export default function AuthPage({ initialMode = 'login' }) {
     const nextMode = mode === 'login' ? 'register' : 'login';
 
     setMode(nextMode);
-    setErr('');
-    setNotice('');
+    setToast(null);
     setForm({});
     setShowPassword(false);
     setShowConfirmPassword(false);
@@ -149,6 +180,8 @@ export default function AuthPage({ initialMode = 'login' }) {
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
+      <AuthToast toast={toast} onDismiss={() => setToast(null)} />
+
       {/* Background decorations */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-32 -left-32 w-80 h-80 bg-slate-700/30 rounded-full blur-3xl" />
@@ -443,21 +476,6 @@ export default function AuthPage({ initialMode = 'login' }) {
                   Passwords do not match.
                 </p>
               )}
-
-            {/* Success */}
-            {notice && (
-              <div className="flex items-start gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
-                <CheckCircle2 size={18} className="shrink-0 mt-0.5" />
-                <span>{notice}</span>
-              </div>
-            )}
-
-            {/* Error */}
-            {err && (
-              <div className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl p-3">
-                {err}
-              </div>
-            )}
 
             {/* Submit */}
             <button

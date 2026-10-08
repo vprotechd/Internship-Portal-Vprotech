@@ -1,5 +1,12 @@
 
-import { useCallback, useEffect, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   Download,
   Pencil,
@@ -31,6 +38,43 @@ const btn =
   'px-3 py-2 rounded-lg text-sm font-medium bg-slate-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition hover:bg-slate-800';
 
 const card = 'bg-white rounded-xl shadow-sm border border-slate-100 p-4';
+
+const ToastContext = createContext(() => {});
+
+const useToast = () => useContext(ToastContext);
+
+function ToastItem({ toast, onDismiss }) {
+  useEffect(() => {
+    const timeout = setTimeout(() => onDismiss(toast.id), 4000);
+    return () => clearTimeout(timeout);
+  }, [onDismiss, toast.id]);
+
+  const isError = toast.type === 'error';
+  const isInfo = toast.type === 'info';
+
+  return (
+    <div
+      role={isError ? 'alert' : 'status'}
+      className={`flex items-start gap-3 rounded-xl border p-4 shadow-lg ${
+        isError
+          ? 'border-red-200 bg-red-50 text-red-800'
+          : isInfo
+            ? 'border-sky-200 bg-sky-50 text-sky-800'
+            : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+      }`}
+    >
+      <span className="flex-1 text-sm font-medium">{toast.message}</span>
+      <button
+        type="button"
+        aria-label="Dismiss notification"
+        className="text-lg leading-4 opacity-70 hover:opacity-100"
+        onClick={() => onDismiss(toast.id)}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
 
 const useList = (path) => {
   const [items, setItems] = useState([]);
@@ -195,6 +239,7 @@ function DashboardTab() {
 
 function DomainsTab() {
   const [domains, load] = useList('/admin/domains');
+  const toast = useToast();
 
   const [f, setF] = useState({
     name: '',
@@ -225,6 +270,7 @@ function DomainsTab() {
 
       setEdit(null);
       load();
+      toast(`Domain ${edit ? 'updated' : 'created'} successfully.`);
     } catch (e) {
       setErr(msg(e));
     } finally {
@@ -239,6 +285,7 @@ function DomainsTab() {
       });
 
       load();
+      toast(`Domain ${d.isActive ? 'deactivated' : 'activated'} successfully.`);
     } catch (e) {
       setErr(msg(e));
     }
@@ -250,6 +297,7 @@ function DomainsTab() {
     try {
       await api.delete(`/admin/domains/${d._id}`);
       load();
+      toast('Domain deleted successfully.');
     } catch (e) {
       setErr(msg(e));
     }
@@ -422,6 +470,7 @@ const blankQ = {
 
 function QuestionsTab() {
   const [qs, load] = useList('/admin/questions');
+  const toast = useToast();
 
   const [f, setF] = useState(blankQ);
   const [id, setId] = useState(null);
@@ -444,6 +493,7 @@ function QuestionsTab() {
       setF(blankQ);
       setId(null);
       load();
+      toast(`Question ${id ? 'updated' : 'added'} successfully.`);
     } catch (x) {
       setErr(msg(x));
     } finally {
@@ -457,6 +507,7 @@ function QuestionsTab() {
     try {
       await api.delete(`/admin/questions/${q._id}`);
       load();
+      toast('Question deleted successfully.');
     } catch (e) {
       setErr(msg(e));
     }
@@ -666,6 +717,7 @@ function TestsTab() {
   const [tests, load] = useList('/admin/tests');
   const [qs] = useList('/admin/questions');
   const [domains] = useList('/admin/domains');
+  const toast = useToast();
 
   const [f, setF] = useState(blankT);
   const [id, setId] = useState(null);
@@ -688,6 +740,7 @@ function TestsTab() {
       setF(blankT);
       setId(null);
       load();
+      toast(`Test ${id ? 'updated' : 'created'} successfully.`);
     } catch (x) {
       setErr(msg(x));
     } finally {
@@ -715,6 +768,7 @@ function TestsTab() {
     try {
       await api.delete(`/admin/tests/${t._id}`);
       load();
+      toast('Test deleted successfully.');
     } catch (e) {
       setErr(msg(e));
     }
@@ -727,6 +781,7 @@ function TestsTab() {
       );
 
       load();
+      toast(t.isReleased ? 'Test stopped.' : 'Test released.');
     } catch (e) {
       setErr(msg(e));
     }
@@ -968,6 +1023,7 @@ function ReviewPanel({
   onClose,
   onSaved,
 }) {
+  const toast = useToast();
   const [s, setS] = useState(null);
   const [marks, setMarks] = useState(0);
   const [err, setErr] = useState('');
@@ -1004,6 +1060,7 @@ function ReviewPanel({
       });
 
       onSaved();
+      toast('Review saved successfully.');
       onClose();
     } catch (e) {
       setErr(msg(e));
@@ -1338,6 +1395,7 @@ function ResultsTab() {
 
 function StudentsTab() {
   const [domains] = useList('/admin/domains');
+  const toast = useToast();
 
   const [q, setQ] = useState('');
   const [domainId, setDomainId] = useState('');
@@ -1394,7 +1452,7 @@ function StudentsTab() {
     if (!password) return;
 
     if (password.length < 6) {
-      alert('Password must contain at least 6 characters.');
+      toast('Password must contain at least 6 characters.', 'error');
       return;
     }
 
@@ -1404,9 +1462,9 @@ function StudentsTab() {
         { password }
       );
 
-      alert('Password updated successfully.');
+      toast('Password updated successfully.');
     } catch (e) {
-      alert(msg(e));
+      toast(msg(e), 'error');
     }
   };
 
@@ -1482,7 +1540,7 @@ function StudentsTab() {
       }
 
       if (!allStudents.length) {
-        alert('There are no students to export.');
+        toast('There are no students to export.', 'info');
         return;
       }
 
@@ -1593,11 +1651,13 @@ function StudentsTab() {
       link.remove();
 
       window.URL.revokeObjectURL(url);
+      toast(`${allStudents.length} student records exported.`);
     } catch (e) {
       setError(
         msg(e) ||
           'Unable to download student data.'
       );
+      toast(msg(e) || 'Unable to download student data.', 'error');
     } finally {
       setExporting(false);
     }
@@ -1997,9 +2057,20 @@ export default function AdminPanel() {
   const [tab, setTab] = useState('Dashboard');
   const [loggingOut, setLoggingOut] =
     useState(false);
+  const [toasts, setToasts] = useState([]);
+  const nextToastId = useRef(0);
 
   const { logout } = useAuth();
   const navigate = useNavigate();
+
+  const dismissToast = useCallback((id) => {
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+  }, []);
+
+  const notify = useCallback((message, type = 'success') => {
+    const id = nextToastId.current++;
+    setToasts((current) => [...current, { id, message, type }]);
+  }, []);
 
   const Component =
     tabs.find((x) => x[0] === tab)?.[2] ||
@@ -2025,72 +2096,83 @@ export default function AdminPanel() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-100">
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-5">
-        {/* Header */}
-        <header className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 sm:p-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-slate-700 text-white flex items-center justify-center">
-                  <LayoutDashboard size={22} />
-                </div>
+    <ToastContext.Provider value={notify}>
+      <div className="min-h-screen bg-stone-100">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-5">
+          {/* Header */}
+          <header className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-slate-700 text-white flex items-center justify-center">
+                    <LayoutDashboard size={22} />
+                  </div>
 
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
-                    VProTech Admin Dashboard
-                  </h1>
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
+                      VProTech Admin Dashboard
+                    </h1>
 
-                  <p className="text-sm text-slate-500">
-                    Manage students, domains, questions,
-                    tests and results.
-                  </p>
+                    <p className="text-sm text-slate-500">
+                      Manage students, domains, questions,
+                      tests and results.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Logout */}
-            <button
-              type="button"
-              onClick={handleLogout}
-              disabled={loggingOut}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
-            >
-              <LogOut size={17} />
-
-              {loggingOut
-                ? 'Logging out...'
-                : 'Logout'}
-            </button>
-          </div>
-        </header>
-
-        {/* Navigation */}
-        <nav className="bg-white rounded-xl shadow-sm border border-slate-100 p-2 flex gap-1 overflow-x-auto">
-          {tabs.map(
-            ([name, Icon]) => (
+              {/* Logout */}
               <button
-                key={name}
                 type="button"
-                onClick={() => setTab(name)}
-                className={`shrink-0 px-3 py-2.5 rounded-lg text-sm flex items-center gap-2 transition ${
-                  tab === name
-                    ? 'bg-slate-700 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-stone-100'
-                }`}
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
               >
-                <Icon size={16} />
-                {name}
-              </button>
-            )
-          )}
-        </nav>
+                <LogOut size={17} />
 
-        {/* Current tab */}
-        <main>
-          <Component />
-        </main>
+                {loggingOut
+                  ? 'Logging out...'
+                  : 'Logout'}
+              </button>
+            </div>
+          </header>
+
+          {/* Navigation */}
+          <nav className="bg-white rounded-xl shadow-sm border border-slate-100 p-2 flex gap-1 overflow-x-auto">
+            {tabs.map(
+              ([name, Icon]) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => setTab(name)}
+                  className={`shrink-0 px-3 py-2.5 rounded-lg text-sm flex items-center gap-2 transition ${
+                    tab === name
+                      ? 'bg-slate-700 text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-stone-100'
+                  }`}
+                >
+                  <Icon size={16} />
+                  {name}
+                </button>
+              )
+            )}
+          </nav>
+
+          {/* Current tab */}
+          <main>
+            <Component />
+          </main>
+        </div>
       </div>
-    </div>
+      <div className="fixed right-4 top-4 z-50 flex w-[min(24rem,calc(100%-2rem))] flex-col gap-2">
+        {toasts.map((toast) => (
+          <ToastItem
+            key={toast.id}
+            toast={toast}
+            onDismiss={dismissToast}
+          />
+        ))}
+      </div>
+    </ToastContext.Provider>
   );
 }

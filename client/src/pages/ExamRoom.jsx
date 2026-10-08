@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -27,6 +27,40 @@ const fmt = (s) =>
     s % 60
   ).padStart(2, '0')}`;
 
+function ExamToast({ toast, onDismiss }) {
+  useEffect(() => {
+    if (!toast) return undefined;
+
+    const timeout = setTimeout(() => onDismiss(toast.id), 5000);
+    return () => clearTimeout(timeout);
+  }, [toast, onDismiss]);
+
+  if (!toast) return null;
+
+  const isError = toast.type === 'error';
+
+  return (
+    <div
+      role={isError ? 'alert' : 'status'}
+      className={`fixed right-4 top-4 z-[60] flex w-[min(24rem,calc(100%-2rem))] items-start gap-3 rounded-xl border p-4 shadow-lg ${
+        isError
+          ? 'border-red-200 bg-red-50 text-red-800'
+          : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+      }`}
+    >
+      <span className="flex-1 text-sm font-medium">{toast.message}</span>
+      <button
+        type="button"
+        aria-label="Dismiss notification"
+        className="text-lg leading-4 opacity-70 hover:opacity-100"
+        onClick={() => onDismiss(toast.id)}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 export default function ExamRoom() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -39,7 +73,7 @@ export default function ExamRoom() {
   const [left, setLeft] = useState(0);
   const [strikes, setStrikes] = useState(0);
   const [warn, setWarn] = useState(false);
-  const [err, setErr] = useState('');
+  const [toast, setToast] = useState(null);
   const [loadingInfo, setLoadingInfo] = useState(true);
   const [starting, setStarting] = useState(false);
   const [activeQuestion, setActiveQuestion] = useState(0);
@@ -62,6 +96,15 @@ export default function ExamRoom() {
   latest.current = answers;
 
   const busy = useRef(false);
+  const nextToastId = useRef(0);
+
+  const showToast = useCallback((message, type = 'error') => {
+    setToast({ id: nextToastId.current++, message, type });
+  }, []);
+
+  const dismissToast = useCallback((toastId) => {
+    setToast((current) => current?.id === toastId ? null : current);
+  }, []);
 
   // ---------------------------------------------------------
   // LOAD TEST INFORMATION
@@ -82,9 +125,9 @@ export default function ExamRoom() {
           setPhase('done');
         }
       })
-      .catch((e) => setErr(msg(e)))
+      .catch((e) => showToast(msg(e)))
       .finally(() => setLoadingInfo(false));
-  }, [id]);
+  }, [id, showToast]);
 
   // ---------------------------------------------------------
   // FULLSCREEN STATE
@@ -229,7 +272,7 @@ export default function ExamRoom() {
   // ---------------------------------------------------------
 
   const start = async () => {
-    setErr('');
+    setToast(null);
     setCameraError('');
     setStarting(true);
 
@@ -269,7 +312,7 @@ export default function ExamRoom() {
       if (/expired|already submitted/i.test(message)) {
         setPhase('done');
       } else {
-        setErr(message);
+        showToast(message);
       }
     } finally {
       setStarting(false);
@@ -284,7 +327,7 @@ export default function ExamRoom() {
     if (busy.current || phase !== 'exam') return;
 
     busy.current = true;
-    setErr('');
+    setToast(null);
 
     try {
       await api.post(`/exam/tests/${id}/submit`, {
@@ -295,13 +338,14 @@ export default function ExamRoom() {
       stopCamera();
 
       setPhase('done');
+      showToast('Test submitted successfully.', 'success');
 
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => {});
       }
     } catch (e) {
       busy.current = false;
-      setErr(msg(e));
+      showToast(msg(e));
     }
   };
 
@@ -479,6 +523,7 @@ export default function ExamRoom() {
   if (phase === 'instructions') {
     return (
       <div className="min-h-screen bg-stone-100 p-4 sm:p-6 grid place-items-center">
+        <ExamToast toast={toast} onDismiss={dismissToast} />
         <div className="w-full max-w-3xl">
           <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
 
@@ -648,17 +693,6 @@ export default function ExamRoom() {
                 </div>
               </div>
 
-              {err && (
-                <div className="mt-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                  <AlertTriangle
-                    size={19}
-                    className="shrink-0 mt-0.5"
-                  />
-
-                  <span>{err}</span>
-                </div>
-              )}
-
               <div className="flex flex-col sm:flex-row gap-3 mt-7">
 
                 <button
@@ -710,6 +744,7 @@ export default function ExamRoom() {
   if (phase === 'done') {
     return (
       <div className="min-h-screen bg-stone-100 p-4 grid place-items-center">
+        <ExamToast toast={toast} onDismiss={dismissToast} />
 
         <div className="bg-white rounded-3xl shadow-xl border border-slate-200 p-7 sm:p-9 text-center max-w-md w-full">
 
@@ -772,6 +807,7 @@ export default function ExamRoom() {
   if (!test) {
     return (
       <div className="min-h-screen bg-stone-100 grid place-items-center p-4">
+        <ExamToast toast={toast} onDismiss={dismissToast} />
 
         <div className="text-center">
 
@@ -793,6 +829,7 @@ export default function ExamRoom() {
 
   return (
     <div className="min-h-screen bg-stone-100">
+      <ExamToast toast={toast} onDismiss={dismissToast} />
 
       {/* STICKY HEADER */}
       <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm">
@@ -1505,20 +1542,6 @@ export default function ExamRoom() {
           </aside>
 
         </div>
-
-        {/* ERROR */}
-        {err && (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 flex gap-2">
-
-            <AlertTriangle
-              size={17}
-              className="shrink-0"
-            />
-
-            <span>{err}</span>
-
-          </div>
-        )}
 
       </main>
 

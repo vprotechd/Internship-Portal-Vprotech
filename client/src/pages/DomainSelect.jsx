@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -20,6 +20,40 @@ import {
 import api, { msg } from '../api';
 import { useAuth } from '../context/AuthContext';
 
+function DomainToast({ toast, onDismiss }) {
+  useEffect(() => {
+    if (!toast) return undefined;
+
+    const timeout = setTimeout(() => onDismiss(toast.id), 4000);
+    return () => clearTimeout(timeout);
+  }, [toast, onDismiss]);
+
+  if (!toast) return null;
+
+  const isError = toast.type === 'error';
+
+  return (
+    <div
+      role={isError ? 'alert' : 'status'}
+      className={`fixed right-4 top-4 z-50 flex w-[min(24rem,calc(100%-2rem))] items-start gap-3 rounded-xl border p-4 shadow-lg ${
+        isError
+          ? 'border-red-200 bg-red-50 text-red-800'
+          : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+      }`}
+    >
+      <span className="flex-1 text-sm font-medium">{toast.message}</span>
+      <button
+        type="button"
+        aria-label="Dismiss notification"
+        className="text-lg leading-4 opacity-70 hover:opacity-100"
+        onClick={() => onDismiss(toast.id)}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 export default function DomainSelect() {
   const { user, selectDomain, logout } = useAuth();
   const nav = useNavigate();
@@ -30,6 +64,16 @@ export default function DomainSelect() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [toast, setToast] = useState(null);
+  const nextToastId = useRef(0);
+
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ id: nextToastId.current++, message, type });
+  }, []);
+
+  const dismissToast = useCallback((toastId) => {
+    setToast((current) => current?.id === toastId ? null : current);
+  }, []);
 
   // --------------------------------------------
   // Load domains
@@ -125,6 +169,8 @@ export default function DomainSelect() {
   const handleSelect = (id) => {
     setSelected(id);
     setErr('');
+    const domain = domains.find((item) => item._id === id);
+    if (domain) showToast(`${domain.name} selected.`);
   };
 
   // --------------------------------------------
@@ -132,7 +178,7 @@ export default function DomainSelect() {
   // --------------------------------------------
   const submit = async () => {
     if (!selected) {
-      setErr('Please select a domain to continue.');
+      showToast('Please select a domain to continue.', 'error');
       return;
     }
 
@@ -143,7 +189,7 @@ export default function DomainSelect() {
       await selectDomain(selected);
       nav('/', { replace: true });
     } catch (e) {
-      setErr(msg(e));
+      showToast(msg(e), 'error');
     } finally {
       setBusy(false);
     }
@@ -157,14 +203,16 @@ export default function DomainSelect() {
 
     try {
       await logout();
-    } catch {
+    } catch (e) {
       // Preserve existing logout behavior even if
       // the logout request reports an error.
+      showToast(msg(e), 'error');
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-stone-100 to-slate-200 px-4 py-6 sm:px-6 lg:px-8 relative overflow-hidden">
+      <DomainToast toast={toast} onDismiss={dismissToast} />
 
       {/* Background decoration */}
       <div className="absolute -top-32 -right-32 w-80 h-80 bg-slate-300/30 rounded-full blur-3xl pointer-events-none" />

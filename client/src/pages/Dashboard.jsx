@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   LogOut,
@@ -17,6 +17,40 @@ import {
 import api, { msg } from '../api';
 import { useAuth } from '../context/AuthContext';
 
+function DashboardToast({ toast, onDismiss }) {
+  useEffect(() => {
+    if (!toast) return undefined;
+
+    const timeout = setTimeout(() => onDismiss(toast.id), 4000);
+    return () => clearTimeout(timeout);
+  }, [toast, onDismiss]);
+
+  if (!toast) return null;
+
+  const isError = toast.type === 'error';
+
+  return (
+    <div
+      role={isError ? 'alert' : 'status'}
+      className={`fixed right-4 top-4 z-50 flex w-[min(24rem,calc(100%-2rem))] items-start gap-3 rounded-xl border p-4 shadow-lg ${
+        isError
+          ? 'border-red-200 bg-red-50 text-red-800'
+          : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+      }`}
+    >
+      <span className="flex-1 text-sm font-medium">{toast.message}</span>
+      <button
+        type="button"
+        aria-label="Dismiss notification"
+        className="text-lg leading-4 opacity-70 hover:opacity-100"
+        onClick={() => onDismiss(toast.id)}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user, logout } = useAuth();
 
@@ -24,6 +58,16 @@ export default function Dashboard() {
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [toast, setToast] = useState(null);
+  const nextToastId = useRef(0);
+
+  const showToast = useCallback((message, type = 'error') => {
+    setToast({ id: nextToastId.current++, message, type });
+  }, []);
+
+  const dismissToast = useCallback((toastId) => {
+    setToast((current) => current?.id === toastId ? null : current);
+  }, []);
 
   const load = async (isRefresh = false) => {
     if (isRefresh) {
@@ -38,7 +82,9 @@ export default function Dashboard() {
       const response = await api.get('/exam/tests');
       setTests(response.data || []);
     } catch (error) {
-      setErr(msg(error));
+      const message = msg(error);
+      setErr(message);
+      showToast(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -108,8 +154,18 @@ export default function Dashboard() {
       .toUpperCase();
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      showToast(msg(error));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
+      <DashboardToast toast={toast} onDismiss={dismissToast} />
+
       {/* Background decoration */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-slate-200/50 rounded-full blur-3xl" />
@@ -149,7 +205,7 @@ export default function Dashboard() {
             </div>
 
             <button
-              onClick={logout}
+              onClick={handleLogout}
               className="group flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all text-sm font-medium"
             >
               <LogOut
@@ -466,4 +522,3 @@ function StatCard({
     </div>
   );
 }
-
