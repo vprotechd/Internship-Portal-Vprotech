@@ -300,6 +300,7 @@ function DomainsTab() {
       toast('Domain deleted successfully.');
     } catch (e) {
       setErr(msg(e));
+      toast(msg(e), 'error');
     }
   };
 
@@ -510,6 +511,7 @@ function QuestionsTab() {
       toast('Question deleted successfully.');
     } catch (e) {
       setErr(msg(e));
+      toast(msg(e), 'error');
     }
   };
 
@@ -771,6 +773,7 @@ function TestsTab() {
       toast('Test deleted successfully.');
     } catch (e) {
       setErr(msg(e));
+      toast(msg(e), 'error');
     }
   };
 
