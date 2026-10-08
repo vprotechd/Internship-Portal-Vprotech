@@ -1,0 +1,102 @@
+# ==============================
+# Dependencies
+# ==============================
+node_modules/
+*/node_modules/
+
+# ==============================
+# Environment variables / Secrets
+# ==============================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Keep an example environment file
+!.env.example
+
+# ==============================
+# Build / Production
+# ==============================
+dist/
+build/
+.vite/
+coverage/
+
+# ==============================
+# Logs
+# ==============================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==============================
+# IDE / Editors
+# ==============================
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+.idea/
+*.swp
+*.swo
+
+# ==============================
+# OS files
+# ==============================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==============================
+# Temporary files
+# ==============================
+*.tmp
+*.temp
+*.bak
+
+# ==============================
+# Uploads / Generated files
+# ==============================
+uploads/
+server/uploads/
+backend/uploads/
+
+# ==============================
+# Certificates / Private keys
+# ==============================
+*.pem
+*.key
+*.crt
+
+# ==============================
+# Runtime files
+# ==============================
+*.pid
+*.pid.lock
+
+# ==============================
+# Cache
+# ==============================
+.cache/
+.parcel-cache/
+.eslintcache
+
+# ==============================
+# Test / local data
+# ==============================
+.nyc_output/
+
+# ==============================
+# MongoDB local files
+# ==============================
+data/
+mongodb/
+
+
+
+.env
+.node_modules
