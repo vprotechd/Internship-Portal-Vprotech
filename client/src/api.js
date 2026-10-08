@@ -10,16 +10,29 @@ import axios from 'axios';
 | Production:
 |   https://internship-portal-vprotech1.onrender.com/api
 |
-| VITE_API_URL can override both when needed.
+| VITE_API_URL can override the default URL when required.
 |--------------------------------------------------------------------------
 */
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  (window.location.hostname === 'localhost' ||
-  window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:5000/api'
-    : 'https://internship-portal-vprotech1.onrender.com/api');
+const getApiBaseUrl = () => {
+  // If VITE_API_URL is defined, always use it.
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/+$/, '');
+  }
+
+  // Local development
+  if (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1'
+  ) {
+    return 'http://localhost:5000/api';
+  }
+
+  // Production
+  return 'https://internship-portal-vprotech1.onrender.com/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 /*
 |--------------------------------------------------------------------------
@@ -63,9 +76,9 @@ api.interceptors.response.use(
   },
   (error) => {
     /*
-    |----------------------------------------------------------------------
+    |--------------------------------------------------------------------------
     | Network / Server Unavailable
-    |----------------------------------------------------------------------
+    |--------------------------------------------------------------------------
     */
 
     if (!error.response) {
@@ -89,22 +102,43 @@ export const msg = (error) => {
   }
 
   /*
-  | Backend message
+  |--------------------------------------------------------------------------
+  | Backend response message
+  |--------------------------------------------------------------------------
   */
+
   if (error.response?.data?.message) {
     return error.response.data.message;
   }
 
   /*
+  |--------------------------------------------------------------------------
   | Backend error
+  |--------------------------------------------------------------------------
   */
+
   if (error.response?.data?.error) {
     return error.response.data.error;
   }
 
   /*
-  | Axios/network error
+  |--------------------------------------------------------------------------
+  | Validation errors
+  |--------------------------------------------------------------------------
   */
+
+  if (Array.isArray(error.response?.data?.errors)) {
+    return error.response.data.errors
+      .map((item) => item.message || item)
+      .join(', ');
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Axios / Network error
+  |--------------------------------------------------------------------------
+  */
+
   if (error.message) {
     return error.message;
   }
@@ -114,7 +148,7 @@ export const msg = (error) => {
 
 /*
 |--------------------------------------------------------------------------
-| Export Axios Instance
+| Export
 |--------------------------------------------------------------------------
 */
 
