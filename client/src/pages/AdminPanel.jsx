@@ -45,12 +45,15 @@ const useToast = () => useContext(ToastContext);
 
 function ToastItem({ toast, onDismiss }) {
   useEffect(() => {
+    if (toast.type === 'confirm') return undefined;
+
     const timeout = setTimeout(() => onDismiss(toast.id), 4000);
     return () => clearTimeout(timeout);
   }, [onDismiss, toast.id]);
 
   const isError = toast.type === 'error';
   const isInfo = toast.type === 'info';
+  const isConfirm = toast.type === 'confirm';
 
   return (
     <div
@@ -58,12 +61,35 @@ function ToastItem({ toast, onDismiss }) {
       className={`flex items-start gap-3 rounded-xl border p-4 shadow-lg ${
         isError
           ? 'border-red-200 bg-red-50 text-red-800'
+          : isConfirm
+            ? 'border-amber-200 bg-amber-50 text-amber-900'
           : isInfo
             ? 'border-sky-200 bg-sky-50 text-sky-800'
             : 'border-emerald-200 bg-emerald-50 text-emerald-800'
       }`}
     >
       <span className="flex-1 text-sm font-medium">{toast.message}</span>
+      {isConfirm && (
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            className="rounded-lg border border-current/20 px-2 py-1 text-xs font-semibold hover:bg-black/5"
+            onClick={() => onDismiss(toast.id)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="rounded-lg bg-red-700 px-2 py-1 text-xs font-semibold text-white hover:bg-red-800"
+            onClick={() => {
+              onDismiss(toast.id);
+              toast.onConfirm();
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      )}
       <button
         type="button"
         aria-label="Dismiss notification"
@@ -291,17 +317,17 @@ function DomainsTab() {
     }
   };
 
-  const del = async (d) => {
-    if (!confirm('Delete this unused domain?')) return;
-
-    try {
-      await api.delete(`/admin/domains/${d._id}`);
-      load();
-      toast('Domain deleted successfully.');
-    } catch (e) {
-      setErr(msg(e));
-      toast(msg(e), 'error');
-    }
+  const del = (d) => {
+    toast('Delete this unused domain?', 'confirm', async () => {
+      try {
+        await api.delete(`/admin/domains/${d._id}`);
+        load();
+        toast('Domain deleted successfully.');
+      } catch (e) {
+        setErr(msg(e));
+        toast(msg(e), 'error');
+      }
+    });
   };
 
   return (
@@ -2070,9 +2096,12 @@ export default function AdminPanel() {
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
 
-  const notify = useCallback((message, type = 'success') => {
+  const notify = useCallback((message, type = 'success', onConfirm) => {
     const id = nextToastId.current++;
-    setToasts((current) => [...current, { id, message, type }]);
+    setToasts((current) => [
+      ...current,
+      { id, message, type, onConfirm },
+    ]);
   }, []);
 
   const Component =
