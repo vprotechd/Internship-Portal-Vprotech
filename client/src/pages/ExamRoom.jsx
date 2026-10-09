@@ -15,8 +15,6 @@ import {
   Send,
   ShieldAlert,
   Timer,
-  Camera,
-  CameraOff,
 } from 'lucide-react';
 
 import api, { msg } from '../api';
@@ -82,16 +80,6 @@ export default function ExamRoom() {
   const [showSubmitPanel, setShowSubmitPanel] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // ---------------------------------------------------------
-  // CAMERA STATE
-  // ---------------------------------------------------------
-
-  const videoRef = useRef(null);
-  const cameraStreamRef = useRef(null);
-
-  const [cameraStatus, setCameraStatus] = useState('idle');
-  const [cameraError, setCameraError] = useState('');
-
   const latest = useRef(answers);
   latest.current = answers;
 
@@ -151,141 +139,15 @@ export default function ExamRoom() {
     };
   }, []);
 
-  // =========================================================
-  // CAMERA FUNCTIONS
-  // =========================================================
-
-  const stopCamera = () => {
-    if (cameraStreamRef.current) {
-      cameraStreamRef.current.getTracks().forEach((track) => {
-        track.stop();
-      });
-
-      cameraStreamRef.current = null;
-    }
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-
-    setCameraStatus('idle');
-  };
-
-  const startCamera = async () => {
-    setCameraError('');
-    setCameraStatus('starting');
-
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error(
-          'Camera access is not supported by this browser.'
-        );
-      }
-
-      // Stop any previous stream first.
-      if (cameraStreamRef.current) {
-        cameraStreamRef.current
-          .getTracks()
-          .forEach((track) => track.stop());
-
-        cameraStreamRef.current = null;
-      }
-
-      const stream =
-        await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'user',
-            width: {
-              ideal: 1280,
-            },
-            height: {
-              ideal: 720,
-            },
-          },
-          audio: false,
-        });
-
-      cameraStreamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-
-        try {
-          await videoRef.current.play();
-        } catch {
-          // Browser may automatically handle playback.
-        }
-      }
-
-      setCameraStatus('live');
-
-      return true;
-    } catch (error) {
-      console.error('Camera error:', error);
-
-      let message =
-        'Unable to access your camera.';
-
-      if (error?.name === 'NotAllowedError') {
-        message =
-          'Camera permission was denied. Please allow camera access in your browser and try again.';
-      } else if (error?.name === 'NotFoundError') {
-        message =
-          'No camera was found on this device. Please connect a camera and try again.';
-      } else if (error?.name === 'NotReadableError') {
-        message =
-          'Your camera is currently being used by another application. Close other camera applications and try again.';
-      } else if (error?.name === 'OverconstrainedError') {
-        message =
-          'The camera does not support the requested settings. Please try again.';
-      } else if (error?.message) {
-        message = error.message;
-      }
-
-      setCameraStatus('error');
-      setCameraError(message);
-
-      return false;
-    }
-  };
-
-  // ---------------------------------------------------------
-  // CAMERA LIFECYCLE
-  // ---------------------------------------------------------
-
-  useEffect(() => {
-    if (phase !== 'exam') {
-      stopCamera();
-      return undefined;
-    }
-
-    // Start camera when exam becomes active.
-    startCamera();
-
-    return () => {
-      stopCamera();
-    };
-  }, [phase]);
-
   // ---------------------------------------------------------
   // START TEST
   // ---------------------------------------------------------
 
   const start = async () => {
     setToast(null);
-    setCameraError('');
     setStarting(true);
 
     try {
-      // Camera must be available before starting the exam.
-      const cameraReady = await startCamera();
-
-      if (!cameraReady) {
-        throw new Error(
-          'Camera access is required to start this assessment. Please allow camera permission and try again.'
-        );
-      }
-
       // Request fullscreen.
       try {
         await document.documentElement.requestFullscreen?.();
@@ -304,8 +166,6 @@ export default function ExamRoom() {
       setActiveQuestion(0);
       setPhase('exam');
     } catch (e) {
-      stopCamera();
-
       const message =
         e?.message || msg(e);
 
@@ -334,8 +194,6 @@ export default function ExamRoom() {
         answers: latest.current,
         auto,
       });
-
-      stopCamera();
 
       setPhase('done');
       showToast('Test submitted successfully.', 'success');
@@ -392,7 +250,6 @@ export default function ExamRoom() {
         })
         .catch((e) => {
           if (/expired/i.test(msg(e))) {
-            stopCamera();
             setPhase('done');
           }
         });
@@ -417,7 +274,6 @@ export default function ExamRoom() {
       )
       .catch((e) => {
         if (/expired/i.test(msg(e))) {
-          stopCamera();
           setPhase('done');
         }
       });
@@ -613,35 +469,6 @@ export default function ExamRoom() {
 
               </div>
 
-              {/* CAMERA REQUIREMENT */}
-              <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4">
-
-                <div className="flex items-start gap-3">
-
-                  <div className="w-10 h-10 rounded-xl bg-white grid place-items-center shrink-0">
-                    <Camera
-                      size={20}
-                      className="text-blue-700"
-                    />
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-blue-900">
-                      Camera Required
-                    </h3>
-
-                    <p className="text-sm text-blue-700 mt-1 leading-relaxed">
-                      Your camera must be enabled during
-                      the assessment. Camera video is used
-                      for live monitoring only and is not
-                      recorded or stored by this page.
-                    </p>
-                  </div>
-
-                </div>
-
-              </div>
-
               {/* BEFORE YOU BEGIN */}
               <div className="border border-slate-200 rounded-2xl overflow-hidden">
 
@@ -668,12 +495,6 @@ export default function ExamRoom() {
                       icon={<Maximize size={18} />}
                       title="Fullscreen mode"
                       text="The assessment runs in fullscreen where supported."
-                    />
-
-                    <Instruction
-                      icon={<Camera size={18} />}
-                      title="Camera monitoring"
-                      text="Camera permission is required. Your live camera preview is shown during the assessment."
                     />
 
                     <Instruction
@@ -721,10 +542,7 @@ export default function ExamRoom() {
                       Starting Test...
                     </>
                   ) : (
-                    <>
-                      <Camera size={18} />
-                      Start Test
-                    </>
+                    'Start Test'
                   )}
                 </button>
 
@@ -1329,141 +1147,6 @@ export default function ExamRoom() {
                   />
 
                 </div>
-
-              </div>
-
-              {/* =================================================
-                  CAMERA PREVIEW
-              ================================================= */}
-
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-
-                <div className="flex items-center justify-between">
-
-                  <div className="flex items-center gap-2">
-
-                    <Camera
-                      size={17}
-                      className="text-slate-700"
-                    />
-
-                    <span className="font-semibold text-sm text-slate-800">
-                      Camera Preview
-                    </span>
-
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-
-                    {cameraStatus === 'live' ? (
-                      <>
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-
-                        <span className="text-xs text-emerald-600 font-medium">
-                          Live
-                        </span>
-                      </>
-                    ) : cameraStatus ===
-                      'starting' ? (
-                      <>
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-
-                        <span className="text-xs text-amber-600 font-medium">
-                          Starting
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-
-                        <span className="text-xs text-red-600 font-medium">
-                          Off
-                        </span>
-                      </>
-                    )}
-
-                  </div>
-
-                </div>
-
-                {/* VIDEO */}
-                <div className="mt-3 relative w-full aspect-video rounded-xl overflow-hidden bg-slate-950 border border-slate-200">
-
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-
-                  {/* CAMERA STARTING */}
-                  {cameraStatus === 'starting' && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-white">
-
-                      <RefreshCw
-                        size={28}
-                        className="animate-spin text-slate-300"
-                      />
-
-                      <p className="text-xs mt-3 text-slate-300">
-                        Starting camera...
-                      </p>
-
-                    </div>
-                  )}
-
-                  {/* CAMERA ERROR */}
-                  {cameraStatus === 'error' && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-center p-4">
-
-                      <CameraOff
-                        size={30}
-                        className="text-red-400"
-                      />
-
-                      <p className="text-xs text-red-300 mt-3">
-                        Camera unavailable
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={startCamera}
-                        className="mt-3 px-3 py-1.5 rounded-lg bg-white text-slate-800 text-xs font-semibold hover:bg-slate-100"
-                      >
-                        Retry Camera
-                      </button>
-
-                    </div>
-                  )}
-
-                  {/* CAMERA ON BADGE */}
-                  {cameraStatus === 'live' && (
-                    <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg bg-black/70 text-white text-[11px] flex items-center gap-1.5">
-
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-
-                      Camera On
-
-                    </div>
-                  )}
-
-                </div>
-
-                {cameraStatus === 'live' ? (
-                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                   
-                  </p>
-                ) : cameraError ? (
-                  <p className="text-xs text-red-500 mt-2 leading-relaxed">
-                    {cameraError}
-                  </p>
-                ) : (
-                  <p className="text-xs text-slate-400 mt-2">
-                    Camera permission is required for this
-                    assessment.
-                  </p>
-                )}
 
               </div>
 
