@@ -5,6 +5,7 @@ import DomainSelect from './pages/DomainSelect';
 import Dashboard from './pages/Dashboard';
 import ExamRoom from './pages/ExamRoom';
 import AdminPanel from './pages/AdminPanel';
+import DomainQuestions from './pages/DomainQuestions';
 
 function Guard({ role, children }) {
   const { user, loading } = useAuth();
@@ -27,6 +28,7 @@ export default function App() {
       <Route path="/" element={<Guard role="student"><Dashboard /></Guard>} />
       <Route path="/exam/:id" element={<Guard role="student"><ExamRoom /></Guard>} />
       <Route path="/admin" element={<Guard role="admin"><AdminPanel /></Guard>} />
+      <Route path="/admin/domains/:domainId/questions" element={<Guard role="admin"><DomainQuestions /></Guard>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

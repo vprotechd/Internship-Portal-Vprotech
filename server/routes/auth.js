@@ -25,6 +25,8 @@ const pub = (u) => ({
   name: u.name,
   email: u.email,
   phone: u.phone,
+  branch: u.branch,
+  semester: u.semester,
   collegeName: u.collegeName,
   domainId: u.domainId?._id || u.domainId || null,
   domainName: u.domainId?.name || null,
@@ -38,11 +40,15 @@ r.post('/register', wrap(async (req, res) => {
   const email = cleanEmail(req.body.email);
   const phone = String(req.body.phone || '').trim();
   const collegeName = String(req.body.collegeName || '').trim();
+  const branch = String(req.body.branch || '').trim();
+  const semester = String(req.body.semester || '').trim();
   const password = String(req.body.password || '');
   const confirmPassword = String(req.body.confirmPassword || '');
 
-  if (!name || !email || !phone || !collegeName || !password || !confirmPassword)
+  if (!name || !email || !phone || !collegeName || !branch || !semester || !password || !confirmPassword)
     return res.status(400).json({ success: false, message: 'All fields are required' });
+  if (!/^\d{10}$/.test(phone))
+    return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return res.status(400).json({ success: false, message: 'Enter a valid email address' });
   if (password.length < 6)
@@ -53,7 +59,7 @@ r.post('/register', wrap(async (req, res) => {
     return res.status(409).json({ success: false, message: 'Email already registered' });
 
   await User.create({
-    name, email, phone, collegeName,
+    name, email, phone, collegeName, branch, semester,
     passwordHash: await bcrypt.hash(password, 12),
     role: 'student',
   });
@@ -99,7 +105,7 @@ r.put('/domain', auth('student'), wrap(async (req, res) => {
   if (!domain) return res.status(404).json({ success: false, message: 'Domain is not available' });
 
   const u = await User.findByIdAndUpdate(req.user._id, { domainId: domain._id }, { new: true })
-    .select('name email phone collegeName domainId role').populate('domainId', 'name');
+    .select('name email phone collegeName branch semester domainId role').populate('domainId', 'name');
   res.json({ success: true, user: pub(u) });
 }));
 

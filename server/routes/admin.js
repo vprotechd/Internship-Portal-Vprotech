@@ -40,6 +40,7 @@ const validateQuestion = (body) => {
   if (!['mcq', 'coding'].includes(questionType)) return 'Invalid question type';
   if (!['easy', 'medium', 'hard'].includes(difficulty)) return 'Invalid difficulty';
   if (!Number.isFinite(marks) || marks < 0) return 'Invalid marks';
+  if (!validId(body.domainId)) return 'Select a valid domain for this question';
   if (questionType === 'mcq') {
     if (!Array.isArray(body.options) || body.options.length < 2 || body.options.length > 6 || body.options.some((x) => !text(x, 1000)))
       return 'MCQ requires 2-6 non-empty options';
@@ -59,8 +60,8 @@ const validateTest = async (body) => {
   if (!Number.isFinite(passingMarks) || passingMarks < 0) return 'Invalid passing marks';
   if (!Array.isArray(body.questions) || body.questions.some((id) => !validId(id))) return 'Invalid question IDs';
   if (!(await Domain.exists({ _id: body.domainId }))) return 'Domain not found';
-  if (body.questions.length && (await Question.countDocuments({ _id: { $in: body.questions } })) !== body.questions.length)
-    return 'One or more questions do not exist';
+  if (body.questions.length && (await Question.countDocuments({ _id: { $in: body.questions } })) !== new Set(body.questions).size)
+    return 'One or more selected questions were not found';
   return null;
 };
 
@@ -144,26 +145,45 @@ r.delete('/domains/:id', wrap(async (req, res) => {
   res.json({ success: true });
 }));
 
+r.get('/domains/:domainId/questions', wrap(async (req, res) => {
+  if (!validId(req.params.domainId)) return res.status(400).json({ success: false, message: 'Invalid domain ID' });
+  if (!(await Domain.exists({ _id: req.params.domainId }))) return res.status(404).json({ success: false, message: 'Domain not found' });
+  const questions = await Question.find({ domainId: req.params.domainId })
+    .populate('domainId', 'name')
+    .sort('-createdAt')
+    .lean();
+  res.json(questions);
+}));
+
 r.get('/questions', wrap(async (req, res) => {
-  res.json(await Question.find().sort('-createdAt').lean());
+  const filter = {};
+  if (req.query.domainId !== undefined) {
+    if (!validId(req.query.domainId)) return res.status(400).json({ success: false, message: 'Invalid domain ID' });
+    filter.domainId = req.query.domainId;
+  }
+  res.json(await Question.find(filter).populate('domainId', 'name').sort('-createdAt').lean());
 }));
 r.post('/questions', wrap(async (req, res) => {
   const error = validateQuestion(req.body);
   if (error) return res.status(400).json({ success: false, message: error });
+  if (!(await Domain.exists({ _id: req.body.domainId }))) return res.status(404).json({ success: false, message: 'Domain not found' });
   const q = await Question.create({
+    domainId: req.body.domainId,
     questionText: text(req.body.questionText), questionType: req.body.questionType,
     difficulty: req.body.difficulty, marks: Number(req.body.marks),
     options: req.body.questionType === 'mcq' ? req.body.options.map((x) => text(x, 1000)) : [],
     correctOption: req.body.questionType === 'mcq' ? Number(req.body.correctOption) : undefined,
     instructions: text(req.body.instructions, 5000),
   });
-  res.status(201).json(q);
+  res.status(201).json(await q.populate('domainId', 'name'));
 }));
 r.put('/questions/:id', wrap(async (req, res) => {
   if (!validId(req.params.id)) return res.status(400).json({ success: false, message: 'Invalid question ID' });
   const error = validateQuestion(req.body);
   if (error) return res.status(400).json({ success: false, message: error });
+  if (!(await Domain.exists({ _id: req.body.domainId }))) return res.status(404).json({ success: false, message: 'Domain not found' });
   const q = await Question.findByIdAndUpdate(req.params.id, {
+    domainId: req.body.domainId,
     questionText: text(req.body.questionText), questionType: req.body.questionType,
     difficulty: req.body.difficulty, marks: Number(req.body.marks),
     options: req.body.questionType === 'mcq' ? req.body.options.map((x) => text(x, 1000)) : [],
@@ -190,6 +210,7 @@ r.post('/tests', wrap(async (req, res) => {
     title: text(req.body.title, 200), description: text(req.body.description, 5000),
     domainId: req.body.domainId, durationMinutes: Number(req.body.durationMinutes),
     passingMarks: Number(req.body.passingMarks), questions: [...new Set(req.body.questions)],
+    revealAnswersToPassed: req.body.revealAnswersToPassed === true,
     isActive: req.body.isActive !== false, isReleased: false,
   });
   res.status(201).json(await t.populate('domainId', 'name'));
@@ -205,6 +226,7 @@ r.put('/tests/:id', wrap(async (req, res) => {
   current.domainId = req.body.domainId;
   current.durationMinutes = Number(req.body.durationMinutes);
   current.passingMarks = Number(req.body.passingMarks);
+  current.revealAnswersToPassed = req.body.revealAnswersToPassed === true;
   current.questions = [...new Set(req.body.questions)];
   current.isActive = req.body.isActive !== false;
   await current.save();
@@ -267,7 +289,7 @@ r.get('/results', wrap(async (req, res) => {
     { $project: {
       _id: 1, score: 1, manualScore: 1, reviewed: 1, status: 1, tabSwitchCount: 1,
       startedAt: 1, submittedAt: 1, passingMarks: '$test.passingMarks',
-      student: { name: 1, email: 1, phone: 1, collegeName: 1 },
+      student: { name: 1, email: 1, phone: 1, collegeName: 1, branch: 1, semester: 1 },
       domain: { name: 1 }, test: { title: 1 },
     } },
   ];
@@ -287,18 +309,18 @@ r.get('/results', wrap(async (req, res) => {
 r.get('/results/export.csv', wrap(async (req, res) => {
   await expireOldAttempts();
   const match = resultMatch(req.query);
-  const cursor = Submission.find(match).populate({ path: 'studentId', select: 'name email phone collegeName domainId', populate: { path: 'domainId', select: 'name' } }).populate('testId', 'title passingMarks').sort({ submittedAt: -1 }).lean().cursor();
+  const cursor = Submission.find(match).populate({ path: 'studentId', select: 'name email phone collegeName branch semester domainId', populate: { path: 'domainId', select: 'name' } }).populate('testId', 'title passingMarks').sort({ submittedAt: -1 }).lean().cursor();
   const esc = (v) => {
     const t = String(v ?? '');
     const safe = /^[=+\-@]/.test(t) ? `'${t}` : t;
     return `"${safe.replace(/"/g, '""')}"`;
   };
   res.type('text/csv').attachment('results.csv');
-  res.write(['Student', 'Email', 'Phone', 'College', 'Domain', 'Test', 'Score', 'Passing Marks', 'Pass/Fail', 'Status', 'Tab Switches', 'Submitted At'].map(esc).join(',') + '\n');
+  res.write(['Student', 'Email', 'Phone', 'College', 'Branch', 'Semester', 'Domain', 'Test', 'Score', 'Passing Marks', 'Pass/Fail', 'Status', 'Tab Switches', 'Submitted At'].map(esc).join(',') + '\n');
   for await (const s of cursor) {
     const u = s.studentId || {}, t = s.testId || {};
     const total = Number(s.score || 0) + Number(s.manualScore || 0);
-    const row = [u.name, u.email, u.phone, u.collegeName, u.domainId?.name, t.title, total, t.passingMarks, total >= t.passingMarks ? 'Pass' : 'Fail', s.status, s.tabSwitchCount, s.submittedAt?.toISOString()];
+    const row = [u.name, u.email, u.phone, u.collegeName, u.branch, u.semester, u.domainId?.name, t.title, total, t.passingMarks, total >= t.passingMarks ? 'Pass' : 'Fail', s.status, s.tabSwitchCount, s.submittedAt?.toISOString()];
     res.write(row.map(esc).join(',') + '\n');
   }
   res.end();

@@ -26,7 +26,9 @@ const inp =
 const fields = [
   ['name', 'Full Name', 'text', User],
   ['email', 'Email Address', 'email', Mail],
-  ['phone', 'Phone Number', 'tel', Phone],
+  ['phone', 'Phone Number (10 digits)', 'tel', Phone],
+  ['branch', 'Branch', 'text', GraduationCap],
+  ['semester', 'Semester', 'text', ClipboardCheck],
   ['collegeName', 'College Name', 'text', Building2],
 ];
 
@@ -331,6 +333,10 @@ export default function AuthPage({ initialMode = 'login' }) {
                     className={inp}
                     placeholder={label}
                     type={type || 'text'}
+                    maxLength={key === 'phone' ? 10 : undefined}
+                    inputMode={key === 'phone' ? 'numeric' : undefined}
+                    pattern={key === 'phone' ? '[0-9]{10}' : undefined}
+                    onInput={key === 'phone' ? (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10); } : undefined}
                     required
                     value={form[key] || ''}
                     onChange={set(key)}

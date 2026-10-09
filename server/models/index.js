@@ -13,7 +13,9 @@ export const Domain = model('Domain', domainSchema);
 const userSchema = new Schema({
   name: { type: String, required: true, trim: true, minlength: 2, maxlength: 100 },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
-  phone: { type: String, required: true, trim: true, maxlength: 30 },
+  phone: { type: String, required: true, trim: true, match: /^\d{10}$/ },
+  branch: { type: String, required: true, trim: true, maxlength: 100 },
+  semester: { type: String, required: true, trim: true, maxlength: 30 },
   collegeName: { type: String, trim: true, maxlength: 150, default: '' },
   domainId: { type: Schema.Types.ObjectId, ref: 'Domain', index: true, default: null },
   passwordHash: { type: String, required: true, select: false },
@@ -23,6 +25,7 @@ userSchema.index({ createdAt: -1 });
 export const User = model('User', userSchema);
 
 const questionSchema = new Schema({
+  domainId: { type: Schema.Types.ObjectId, ref: 'Domain', required: true, index: true },
   questionText: { type: String, required: true, trim: true, maxlength: 10000 },
   options: { type: [String], default: [] },
   correctOption: { type: Number, min: 0 },
@@ -40,6 +43,7 @@ const testSchema = new Schema({
   domainId: { type: Schema.Types.ObjectId, ref: 'Domain', required: true, index: true },
   durationMinutes: { type: Number, required: true, min: 1, max: 1440 },
   passingMarks: { type: Number, min: 0, default: 0 },
+  revealAnswersToPassed: { type: Boolean, default: false },
   questions: [{ type: Schema.Types.ObjectId, ref: 'Question' }],
   isActive: { type: Boolean, default: true, index: true },
   isReleased: { type: Boolean, default: false, index: true },
@@ -51,6 +55,7 @@ const submissionSchema = new Schema({
   studentId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   testId: { type: Schema.Types.ObjectId, ref: 'Test', required: true },
   answers: { type: Map, of: Schema.Types.Mixed, default: {} },
+  questionOrder: [{ type: Schema.Types.ObjectId, ref: 'Question' }],
   score: { type: Number, default: 0 },
   manualScore: { type: Number, default: 0 },
   reviewed: { type: Boolean, default: false },

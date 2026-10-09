@@ -48,7 +48,7 @@ r.get('/tests', wrap(async (req, res) => {
   if (!req.user.domainId) return res.json([]);
   const tests = await Test.find({
     isActive: true, isReleased: true, domainId: req.user.domainId,
-  }).select('title description durationMinutes questions createdAt').lean();
+  }).select('title description durationMinutes passingMarks revealAnswersToPassed questions createdAt').lean();
   const subs = await Submission.find({ studentId: req.user._id }).select('testId status').lean();
   const status = new Map(subs.map((s) => [String(s.testId), s.status]));
   res.json(tests.map((t) => ({
@@ -79,7 +79,9 @@ r.post('/tests/:id/start', wrap(async (req, res) => {
   if (s?.status !== 'in-progress') {
     if (s) return res.status(409).json({ success: false, message: 'You have already submitted this test' });
     const now = new Date();
+    const randomizedQuestions = [...test.questions].sort(() => Math.random() - 0.5);
     s = await Submission.create({
+      questionOrder: randomizedQuestions.map((q) => q._id),
       studentId: req.user._id,
       testId: test._id,
       startedAt: now,
@@ -91,6 +93,10 @@ r.post('/tests/:id/start', wrap(async (req, res) => {
       return res.status(409).json({ success: false, message: 'Test time has expired and the test was submitted' });
   }
 
+  if (s.questionOrder?.length) {
+    const byId = new Map(test.questions.map((q) => [String(q._id), q]));
+    test.questions = s.questionOrder.map((id) => byId.get(String(id))).filter(Boolean);
+  }
   res.json({
     success: true,
     test: { ...test.toObject(), questions: safeQuestions(test.questions) },
@@ -167,6 +173,19 @@ r.post('/tests/:id/submit', wrap(async (req, res) => {
   s.submittedAt = new Date();
   await s.save();
   res.json({ success: true, message: 'Test successfully submitted' });
+}));
+
+
+r.get('/tests/:id/review', wrap(async (req, res) => {
+  const test = await Test.findOne({ _id: req.params.id, domainId: req.user.domainId, isActive: true }).populate('questions');
+  if (!test) return res.status(404).json({ success: false, message: 'Test not available' });
+  const submission = await Submission.findOne({ testId: test._id, studentId: req.user._id, status: { $in: ['submitted', 'auto-submitted'] } });
+  if (!submission) return res.status(404).json({ success: false, message: 'Submit the test before reviewing answers' });
+  const total = Number(submission.score || 0) + Number(submission.manualScore || 0);
+  if (!test.revealAnswersToPassed || total < Number(test.passingMarks || 0))
+    return res.status(403).json({ success: false, message: 'Answer review is available only to students who pass, when enabled by the administrator.' });
+  const answers = submission.answers instanceof Map ? Object.fromEntries(submission.answers) : (submission.answers || {});
+  res.json({ success: true, score: total, passingMarks: test.passingMarks, questions: test.questions.map((q) => ({ _id: q._id, questionText: q.questionText, questionType: q.questionType, options: q.options, correctOption: q.correctOption, marks: q.marks, instructions: q.instructions, yourAnswer: answers[String(q._id)] ?? null })) });
 }));
 
 export default r;

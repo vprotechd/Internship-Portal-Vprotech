@@ -25,6 +25,8 @@ import {
   Filter,
   UserRound,
   FileSpreadsheet,
+  Plus,
+  X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -265,7 +267,16 @@ function DashboardTab() {
 
 function DomainsTab() {
   const [domains, load] = useList('/admin/domains');
+  const [questions, setQuestions] = useState([]);
+  const [questionsLoading, setQuestionsLoading] = useState(true);
+  const [questionsError, setQuestionsError] = useState('');
   const toast = useToast();
+  const navigate = useNavigate();
+  const [questionDomain, setQuestionDomain] = useState(null);
+  const [questionForm, setQuestionForm] = useState({ ...blankQ });
+  const [questionError, setQuestionError] = useState('');
+  const [questionSaving, setQuestionSaving] = useState(false);
+  const questionsVersion = useRef(0);
 
   const [f, setF] = useState({
     name: '',
@@ -275,6 +286,38 @@ function DomainsTab() {
   const [edit, setEdit] = useState(null);
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const loadQuestions = useCallback(async () => {
+    const requestVersion = questionsVersion.current;
+    setQuestionsLoading(true);
+    setQuestionsError('');
+
+    try {
+      const { data } = await api.get('/admin/questions');
+      if (requestVersion === questionsVersion.current) {
+        setQuestions(data);
+      }
+    } catch (e) {
+      if (requestVersion === questionsVersion.current) {
+        setQuestionsError(msg(e));
+      }
+    } finally {
+      if (requestVersion === questionsVersion.current) {
+        setQuestionsLoading(false);
+      }
+    }
+  }, []);
+
+  const questionsForDomain = (domainId) =>
+    questions.filter(
+      (question) =>
+        String(question.domainId?._id || question.domainId || '') ===
+        String(domainId)
+    );
+
+  useEffect(() => {
+    loadQuestions();
+  }, [loadQuestions]);
 
   const saveDomain = async (e) => {
     e.preventDefault();
@@ -328,6 +371,48 @@ function DomainsTab() {
         toast(msg(e), 'error');
       }
     });
+  };
+
+  const openQuestionForm = (domain) => {
+    setQuestionDomain(domain);
+    setQuestionForm({ ...blankQ, domainId: domain._id });
+    setQuestionError('');
+  };
+
+  const saveDomainQuestion = async (e) => {
+    e.preventDefault();
+    if (!questionDomain) return;
+    setQuestionError('');
+    setQuestionSaving(true);
+    try {
+      const { data } = await api.post('/admin/questions', {
+        ...questionForm,
+        domainId: questionDomain._id,
+        options: questionForm.questionType === 'mcq' ? questionForm.options : [],
+        correctOption: Number(questionForm.correctOption),
+        marks: Number(questionForm.marks),
+      });
+      const savedQuestion = {
+        ...data,
+        domainId:
+          data.domainId?._id ||
+          data.domainId ||
+          questionDomain._id,
+      };
+      questionsVersion.current += 1;
+      setQuestionsLoading(false);
+      setQuestionsError('');
+      setQuestions((current) => [
+        savedQuestion,
+        ...current.filter((question) => question._id !== savedQuestion._id),
+      ]);
+      setQuestionForm({ ...blankQ, domainId: questionDomain._id });
+      toast(`Question added to ${questionDomain.name}.`);
+    } catch (e) {
+      setQuestionError(msg(e));
+    } finally {
+      setQuestionSaving(false);
+    }
   };
 
   return (
@@ -410,10 +495,16 @@ function DomainsTab() {
       </form>
 
       <div className="space-y-2">
+        {questionsError && (
+          <p role="alert" className="text-sm text-red-700 bg-red-50 rounded-lg p-3">
+            Unable to load domain questions: {questionsError}
+          </p>
+        )}
         {domains.map((d) => (
           <div
             key={d._id}
-            className={`${card} flex justify-between gap-3 hover:shadow-md transition`}
+            className={`${card} space-y-3 hover:shadow-md transition`}
+            
           >
             <div>
               <b className="text-slate-800">{d.name}</b>
@@ -436,7 +527,15 @@ function DomainsTab() {
               </p>
             </div>
 
-            <div className="flex gap-2 shrink-0">
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <button
+                type="button"
+                className={`${btn} inline-flex items-center gap-1`}
+                onClick={() => navigate(`/admin/domains/${d._id}/questions`)}
+              >
+                <Plus size={15} />
+                Add Question
+              </button>
               <button
                 title="Edit"
                 className="p-2 rounded-lg hover:bg-slate-100"
@@ -474,6 +573,11 @@ function DomainsTab() {
                 />
               </button>
             </div>
+            <div className="space-y-1">
+              <p className="text-xs text-slate-500">
+                {questionsForDomain(d._id).length} questions in this domain
+              </p>
+            </div>
           </div>
         ))}
       </div>
@@ -486,6 +590,7 @@ function DomainsTab() {
 ========================================================= */
 
 const blankQ = {
+  domainId: '',
   questionText: '',
   questionType: 'mcq',
   options: ['', '', '', ''],
@@ -497,6 +602,7 @@ const blankQ = {
 
 function QuestionsTab() {
   const [qs, load] = useList('/admin/questions');
+  const [domains] = useList('/admin/domains');
   const toast = useToast();
 
   const [f, setF] = useState(blankQ);
@@ -550,6 +656,11 @@ function QuestionsTab() {
         <h2 className="font-semibold">
           {id ? 'Edit' : 'Add'} Question
         </h2>
+
+        <select className={inp} value={f.domainId || ''} required onChange={(e) => setF({ ...f, domainId: e.target.value })}>
+          <option value="">Select domain first</option>
+          {domains.filter((d) => d.isActive).map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}
+        </select>
 
         <textarea
           className={inp}
@@ -699,6 +810,7 @@ function QuestionsTab() {
                   setF({
                     ...blankQ,
                     ...q,
+                    domainId: q.domainId?._id || q.domainId || '',
                     options: q.options?.length
                       ? q.options
                       : blankQ.options,
@@ -737,20 +849,72 @@ const blankT = {
   domainId: '',
   durationMinutes: 30,
   passingMarks: 0,
+  revealAnswersToPassed: false,
   isActive: true,
   questions: [],
 };
 
 function TestsTab() {
   const [tests, load] = useList('/admin/tests');
-  const [qs] = useList('/admin/questions');
   const [domains] = useList('/admin/domains');
   const toast = useToast();
 
+  const [qs, setQs] = useState([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [questionsError, setQuestionsError] = useState('');
   const [f, setF] = useState(blankT);
   const [id, setId] = useState(null);
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [qFilter, setQFilter] = useState('');
+
+  const domainQuestions = f.domainId
+    ? qs.filter(
+        (q) =>
+          (qFilter || f.domainId) === 'all' ||
+          String(
+            q.domainId?._id ||
+              q.domainId?.id ||
+              q.domainId ||
+              ''
+          ) ===
+          String(qFilter || f.domainId)
+      )
+    : [];
+
+  useEffect(() => {
+    if (!f.domainId) {
+      setQs([]);
+      setQuestionsError('');
+      setQuestionsLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    setQs([]);
+    setQuestionsLoading(true);
+    setQuestionsError('');
+
+    api
+      .get(`/admin/domains/${f.domainId}/questions`)
+      .then(({ data }) => {
+        if (active) setQs(data);
+      })
+      .catch((error) => {
+        if (active) {
+          setQs([]);
+          setQuestionsError(msg(error));
+        }
+      })
+      .finally(() => {
+        if (active) setQuestionsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [f.domainId]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -766,6 +930,7 @@ function TestsTab() {
       }
 
       setF(blankT);
+      setQFilter('');
       setId(null);
       load();
       toast(`Test ${id ? 'updated' : 'created'} successfully.`);
@@ -855,12 +1020,17 @@ function TestsTab() {
           className={inp}
           required
           value={f.domainId}
-          onChange={(e) =>
+          onChange={(e) => {
+            setQs([]);
+            setQFilter('');
+            setQuestionsError('');
+            setQuestionsLoading(Boolean(e.target.value));
             setF({
               ...f,
               domainId: e.target.value,
-            })
-          }
+              questions: [],
+            });
+          }}
         >
           <option value="">Select domain</option>
 
@@ -926,8 +1096,33 @@ function TestsTab() {
           Active
         </label>
 
+        <label className="flex gap-2 text-sm items-center">
+          <input type="checkbox" checked={!!f.revealAnswersToPassed} onChange={(e) => setF({ ...f, revealAnswersToPassed: e.target.checked })} />
+          Allow passed students to review correct answers after submission
+        </label>
+
+        {f.domainId && (
+          <label className="block text-xs font-medium text-slate-600">
+            Show questions from
+            <select
+              className={`${inp} mt-1`}
+              value={qFilter || f.domainId}
+              onChange={(e) => setQFilter(e.target.value)}
+            >
+              <option value="all">All domains</option>
+              {domains.map((d) => (
+                <option key={d._id} value={d._id}>{d.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <div className="max-h-56 overflow-auto border rounded-lg p-2 space-y-1">
-          {qs.map((q) => (
+          {!f.domainId && <p className="text-sm text-slate-500 p-2">Select a domain first to view or add questions.</p>}
+          {f.domainId && questionsLoading && <p className="text-sm text-slate-500 p-2">Loading questions...</p>}
+          {f.domainId && !questionsLoading && questionsError && <p role="alert" className="text-sm text-red-700 p-2">{questionsError}</p>}
+          {f.domainId && !questionsLoading && !questionsError && !domainQuestions.length && <p className="text-sm text-slate-500 p-2">No questions found for this domain.</p>}
+          {f.domainId && !questionsLoading && !questionsError && domainQuestions.map((q) => (
             <label
               key={q._id}
               className="flex gap-2 text-sm hover:bg-slate-50 p-1 rounded"
@@ -1004,6 +1199,10 @@ function TestsTab() {
               <button
                 className={btn}
                 onClick={() => {
+                  setQs([]);
+                  setQFilter('');
+                  setQuestionsLoading(true);
+                  setQuestionsError('');
                   setF({
                     ...blankT,
                     ...t,
@@ -2102,7 +2301,6 @@ const tabs = [
   ],
   ['Students', Users, StudentsTab],
   ['Domains', Layers3, DomainsTab],
-  ['Questions', HelpCircle, QuestionsTab],
   ['Tests', ClipboardList, TestsTab],
   ['Results', FileCheck2, ResultsTab],
 ];
@@ -2171,8 +2369,7 @@ export default function AdminPanel() {
                     </h1>
 
                     <p className="text-sm text-slate-500">
-                      Manage students, domains, questions,
-                      tests and results.
+                      Manage students, domains, tests and results.
                     </p>
                   </div>
                 </div>
