@@ -53,11 +53,11 @@ const validateQuestion = (body) => {
 const validateTest = async (body) => {
   const title = text(body.title, 200);
   const durationMinutes = Number(body.durationMinutes);
-  const passingMarks = Number(body.passingMarks);
+  const passingMarks = body.passingMarks === null ? null : Number(body.passingMarks);
   if (!title) return 'Test title is required';
   if (!validId(body.domainId)) return 'Valid domain is required';
   if (!Number.isFinite(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440) return 'Duration must be 1-1440 minutes';
-  if (!Number.isFinite(passingMarks) || passingMarks < 0) return 'Invalid passing marks';
+  if (passingMarks !== null && (!Number.isFinite(passingMarks) || passingMarks < 0)) return 'Invalid passing marks';
   if (!Array.isArray(body.questions) || body.questions.some((id) => !validId(id))) return 'Invalid question IDs';
   if (!(await Domain.exists({ _id: body.domainId }))) return 'Domain not found';
   if (body.questions.length && (await Question.countDocuments({ _id: { $in: body.questions } })) !== new Set(body.questions).size)
@@ -209,7 +209,7 @@ r.post('/tests', wrap(async (req, res) => {
   const t = await Test.create({
     title: text(req.body.title, 200), description: text(req.body.description, 5000),
     domainId: req.body.domainId, durationMinutes: Number(req.body.durationMinutes),
-    passingMarks: Number(req.body.passingMarks), questions: [...new Set(req.body.questions)],
+    passingMarks: req.body.passingMarks === null ? null : Number(req.body.passingMarks), questions: [...new Set(req.body.questions)],
     isActive: req.body.isActive !== false, isReleased: false,
   });
   res.status(201).json(await t.populate('domainId', 'name'));
@@ -224,7 +224,7 @@ r.put('/tests/:id', wrap(async (req, res) => {
   current.description = text(req.body.description, 5000);
   current.domainId = req.body.domainId;
   current.durationMinutes = Number(req.body.durationMinutes);
-  current.passingMarks = Number(req.body.passingMarks);
+  current.passingMarks = req.body.passingMarks === null ? null : Number(req.body.passingMarks);
   current.questions = [...new Set(req.body.questions)];
   current.isActive = req.body.isActive !== false;
   await current.save();

@@ -181,6 +181,8 @@ r.get('/tests/:id/review', wrap(async (req, res) => {
   if (!test) return res.status(404).json({ success: false, message: 'Test not available' });
   const submission = await Submission.findOne({ testId: test._id, studentId: req.user._id, status: { $in: ['submitted', 'auto-submitted'] } });
   if (!submission) return res.status(404).json({ success: false, message: 'Submit the test before reviewing answers' });
+  if (test.passingMarks === null)
+    return res.status(403).json({ success: false, message: 'Results are not available for this assessment.' });
   const total = Number(submission.score || 0) + Number(submission.manualScore || 0);
   const passed = total >= Number(test.passingMarks || 0);
   const answers = submission.answers instanceof Map ? Object.fromEntries(submission.answers) : (submission.answers || {});

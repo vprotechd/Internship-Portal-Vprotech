@@ -851,7 +851,7 @@ const blankT = {
   description: '',
   domainId: '',
   durationMinutes: 30,
-  passingMarks: 0,
+  passingMarks: null,
   isActive: true,
   questions: [],
 };
@@ -1069,18 +1069,35 @@ function TestsTab() {
 
           <label className="space-y-1 text-xs font-medium text-slate-600">
             Passing marks
-            <input
+            <select
               className={inp}
-              type="number"
-              min="0"
-              value={f.passingMarks}
+              value={f.passingMarks === null ? 'none' : 'set'}
               onChange={(e) =>
                 setF({
                   ...f,
-                  passingMarks: Number(e.target.value),
+                  passingMarks: e.target.value === 'none'
+                    ? null
+                    : f.passingMarks ?? 0,
                 })
               }
-            />
+            >
+              <option value="none">None (hide student results)</option>
+              <option value="set">Set passing marks</option>
+            </select>
+            {f.passingMarks !== null && (
+              <input
+                className={inp}
+                type="number"
+                min="0"
+                value={f.passingMarks}
+                onChange={(e) =>
+                  setF({
+                    ...f,
+                    passingMarks: Number(e.target.value),
+                  })
+                }
+              />
+            )}
           </label>
         </div>
 
@@ -1172,7 +1189,7 @@ function TestsTab() {
                 <p className="text-xs text-slate-500">
                   {t.domainId?.name} · {t.durationMinutes}m ·{' '}
                   {t.questions?.length || 0} questions · pass{' '}
-                  {t.passingMarks}
+                  {t.passingMarks === null ? 'None' : t.passingMarks}
                 </p>
               </div>
 

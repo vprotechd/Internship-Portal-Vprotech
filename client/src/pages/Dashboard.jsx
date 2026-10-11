@@ -441,7 +441,7 @@ export default function Dashboard() {
                         {(test.status === 'submitted' || test.status === 'auto-submitted') && (
                           <div className="flex flex-col gap-2">
                             <div className="w-full lg:w-auto px-5 py-2.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-semibold flex items-center justify-center gap-2"><CheckCircle2 size={17} />Submitted</div>
-                            <button onClick={() => openReview(test._id)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold hover:bg-slate-50">View Results</button>
+                            {typeof test.passingMarks === 'number' && <button onClick={() => openReview(test._id)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold hover:bg-slate-50">View Results</button>}
                           </div>
                         )}
                       </div>
