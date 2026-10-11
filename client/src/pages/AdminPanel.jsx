@@ -852,7 +852,6 @@ const blankT = {
   domainId: '',
   durationMinutes: 30,
   passingMarks: 0,
-  revealAnswersToPassed: false,
   isActive: true,
   questions: [],
 };
@@ -1098,11 +1097,6 @@ function TestsTab() {
           />
 
           Active
-        </label>
-
-        <label className="flex gap-2 text-sm items-center">
-          <input type="checkbox" checked={!!f.revealAnswersToPassed} onChange={(e) => setF({ ...f, revealAnswersToPassed: e.target.checked })} />
-          Allow passed students to review correct answers after submission
         </label>
 
         {f.domainId && (

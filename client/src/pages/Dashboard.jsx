@@ -441,7 +441,7 @@ export default function Dashboard() {
                         {(test.status === 'submitted' || test.status === 'auto-submitted') && (
                           <div className="flex flex-col gap-2">
                             <div className="w-full lg:w-auto px-5 py-2.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-semibold flex items-center justify-center gap-2"><CheckCircle2 size={17} />Submitted</div>
-                            {test.revealAnswersToPassed && <button onClick={() => openReview(test._id)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold hover:bg-slate-50">Review Answers</button>}
+                            <button onClick={() => openReview(test._id)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold hover:bg-slate-50">View Results</button>
                           </div>
                         )}
                       </div>
@@ -486,7 +486,55 @@ export default function Dashboard() {
           </p>
         </footer>
       </div>
-      {review && <div className="fixed inset-0 z-50 bg-slate-900/50 p-4 flex items-center justify-center"><div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-auto p-5"><div className="flex justify-between items-center mb-4"><div><h2 className="text-lg font-bold">Answer Review</h2><p className="text-sm text-slate-500">Score: {review.score} · Passing marks: {review.passingMarks}</p></div><button className="px-3 py-2 border rounded-lg" onClick={() => setReview(null)}>Close</button></div>{review.questions.map((q, i) => <div key={q._id} className="border rounded-xl p-3 mb-3"><b>{i + 1}. {q.questionText}</b>{q.questionType === 'mcq' && <div className="mt-2 space-y-1 text-sm">{q.options.map((o, j) => <p key={j} className={j === q.correctOption ? 'text-emerald-700 font-semibold' : 'text-slate-600'}>{String.fromCharCode(65+j)}. {o} {j === q.correctOption ? '✓ Correct answer' : ''} {Number(q.yourAnswer) === j ? '· Your answer' : ''}</p>)}</div>}</div>)}</div></div>}
+      {review && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="max-h-[85vh] w-full max-w-3xl overflow-auto rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold">Assessment Results</h2>
+               
+              </div>
+              <button className="rounded-lg border px-3 py-2" onClick={() => setReview(null)}>
+                Close
+              </button>
+            </div>
+            <p className={`mb-4 rounded-xl p-3 text-sm font-medium ${
+              review.passed
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'bg-red-50 text-red-700'
+            }`}>
+              {review.passed
+                ? 'Congratulations! You are shortlisted for the next round.'
+                : 'Thank you for participating in the VProTech assessment. After reviewing the applications, we regret to inform you that you have not been shortlisted for the next round at this stage. We appreciate your time and encourage you to apply for future opportunities.'}
+            </p>
+            {review.questions.map((q, i) => (
+              <div key={q._id} className="mb-3 rounded-xl border p-3">
+                <b>{i + 1}. {q.questionText}</b>
+                {q.questionType === 'mcq' && (
+                  <div className="mt-2 space-y-1 text-sm">
+                    {q.options.map((option, j) => (
+                      <p
+                        key={j}
+                        className={
+                          j === q.correctOption
+                            ? 'font-semibold text-emerald-700'
+                            : Number(q.yourAnswer) === j
+                              ? 'font-semibold text-red-600'
+                              : 'text-slate-600'
+                        }
+                      >
+                        {String.fromCharCode(65 + j)}. {option}{' '}
+                        {j === q.correctOption ? '✓ Correct answer' : ''}
+                        {Number(q.yourAnswer) === j ? ' · Your answer' : ''}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

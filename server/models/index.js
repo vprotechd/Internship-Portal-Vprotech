@@ -43,7 +43,6 @@ const testSchema = new Schema({
   domainId: { type: Schema.Types.ObjectId, ref: 'Domain', required: true, index: true },
   durationMinutes: { type: Number, required: true, min: 1, max: 1440 },
   passingMarks: { type: Number, min: 0, default: 0 },
-  revealAnswersToPassed: { type: Boolean, default: false },
   questions: [{ type: Schema.Types.ObjectId, ref: 'Question' }],
   isActive: { type: Boolean, default: true, index: true },
   isReleased: { type: Boolean, default: false, index: true },

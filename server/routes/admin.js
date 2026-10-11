@@ -210,7 +210,6 @@ r.post('/tests', wrap(async (req, res) => {
     title: text(req.body.title, 200), description: text(req.body.description, 5000),
     domainId: req.body.domainId, durationMinutes: Number(req.body.durationMinutes),
     passingMarks: Number(req.body.passingMarks), questions: [...new Set(req.body.questions)],
-    revealAnswersToPassed: req.body.revealAnswersToPassed === true,
     isActive: req.body.isActive !== false, isReleased: false,
   });
   res.status(201).json(await t.populate('domainId', 'name'));
@@ -226,7 +225,6 @@ r.put('/tests/:id', wrap(async (req, res) => {
   current.domainId = req.body.domainId;
   current.durationMinutes = Number(req.body.durationMinutes);
   current.passingMarks = Number(req.body.passingMarks);
-  current.revealAnswersToPassed = req.body.revealAnswersToPassed === true;
   current.questions = [...new Set(req.body.questions)];
   current.isActive = req.body.isActive !== false;
   await current.save();

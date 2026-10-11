@@ -48,7 +48,7 @@ r.get('/tests', wrap(async (req, res) => {
   if (!req.user.domainId) return res.json([]);
   const tests = await Test.find({
     isActive: true, isReleased: true, domainId: req.user.domainId,
-  }).select('title description durationMinutes passingMarks revealAnswersToPassed questions createdAt').lean();
+  }).select('title description durationMinutes passingMarks questions createdAt').lean();
   const subs = await Submission.find({ studentId: req.user._id }).select('testId status').lean();
   const status = new Map(subs.map((s) => [String(s.testId), s.status]));
   res.json(tests.map((t) => ({
@@ -182,10 +182,15 @@ r.get('/tests/:id/review', wrap(async (req, res) => {
   const submission = await Submission.findOne({ testId: test._id, studentId: req.user._id, status: { $in: ['submitted', 'auto-submitted'] } });
   if (!submission) return res.status(404).json({ success: false, message: 'Submit the test before reviewing answers' });
   const total = Number(submission.score || 0) + Number(submission.manualScore || 0);
-  if (!test.revealAnswersToPassed || total < Number(test.passingMarks || 0))
-    return res.status(403).json({ success: false, message: 'Answer review is available only to students who pass, when enabled by the administrator.' });
+  const passed = total >= Number(test.passingMarks || 0);
   const answers = submission.answers instanceof Map ? Object.fromEntries(submission.answers) : (submission.answers || {});
-  res.json({ success: true, score: total, passingMarks: test.passingMarks, questions: test.questions.map((q) => ({ _id: q._id, questionText: q.questionText, questionType: q.questionType, options: q.options, correctOption: q.correctOption, marks: q.marks, instructions: q.instructions, yourAnswer: answers[String(q._id)] ?? null })) });
+  res.json({
+    success: true,
+    score: total,
+    totalMarks: test.questions.reduce((sum, question) => sum + Number(question.marks || 0), 0),
+    passed,
+    questions: test.questions.map((q) => ({ _id: q._id, questionText: q.questionText, questionType: q.questionType, options: q.options, correctOption: q.correctOption, marks: q.marks, instructions: q.instructions, yourAnswer: answers[String(q._id)] ?? null })),
+  });
 }));
 
 export default r;
