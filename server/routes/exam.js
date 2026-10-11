@@ -48,11 +48,12 @@ r.get('/tests', wrap(async (req, res) => {
   if (!req.user.domainId) return res.json([]);
   const tests = await Test.find({
     isActive: true, isReleased: true, domainId: req.user.domainId,
-  }).select('title description durationMinutes passingMarks questions createdAt').lean();
+  }).select('title description durationMinutes passingMarks resultsEnabled questions createdAt').lean();
   const subs = await Submission.find({ studentId: req.user._id }).select('testId status').lean();
   const status = new Map(subs.map((s) => [String(s.testId), s.status]));
   res.json(tests.map((t) => ({
     ...t,
+    resultsEnabled: t.resultsEnabled === true || Number(t.passingMarks) > 0,
     questionCount: t.questions.length,
     questions: undefined,
     status: status.get(String(t._id)) || 'new',
@@ -181,7 +182,8 @@ r.get('/tests/:id/review', wrap(async (req, res) => {
   if (!test) return res.status(404).json({ success: false, message: 'Test not available' });
   const submission = await Submission.findOne({ testId: test._id, studentId: req.user._id, status: { $in: ['submitted', 'auto-submitted'] } });
   if (!submission) return res.status(404).json({ success: false, message: 'Submit the test before reviewing answers' });
-  if (test.passingMarks === null)
+  const resultsEnabled = test.resultsEnabled === true || Number(test.passingMarks) > 0;
+  if (!resultsEnabled)
     return res.status(403).json({ success: false, message: 'Results are not available for this assessment.' });
   const total = Number(submission.score || 0) + Number(submission.manualScore || 0);
   const passed = total >= Number(test.passingMarks || 0);

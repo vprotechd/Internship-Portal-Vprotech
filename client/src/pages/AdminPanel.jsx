@@ -851,6 +851,7 @@ const blankT = {
   description: '',
   domainId: '',
   durationMinutes: 30,
+  resultsEnabled: false,
   passingMarks: null,
   isActive: true,
   questions: [],
@@ -1071,20 +1072,21 @@ function TestsTab() {
             Passing marks
             <select
               className={inp}
-              value={f.passingMarks === null ? 'none' : 'set'}
+              value={f.resultsEnabled ? 'set' : 'none'}
               onChange={(e) =>
                 setF({
                   ...f,
-                  passingMarks: e.target.value === 'none'
-                    ? null
-                    : f.passingMarks ?? 0,
+                  resultsEnabled: e.target.value === 'set',
+                  passingMarks: e.target.value === 'set'
+                    ? f.passingMarks ?? 0
+                    : null,
                 })
               }
             >
               <option value="none">None (hide student results)</option>
               <option value="set">Set passing marks</option>
             </select>
-            {f.passingMarks !== null && (
+            {f.resultsEnabled && (
               <input
                 className={inp}
                 type="number"
@@ -1189,7 +1191,9 @@ function TestsTab() {
                 <p className="text-xs text-slate-500">
                   {t.domainId?.name} · {t.durationMinutes}m ·{' '}
                   {t.questions?.length || 0} questions · pass{' '}
-                  {t.passingMarks === null ? 'None' : t.passingMarks}
+                  {(t.resultsEnabled === true || Number(t.passingMarks) > 0)
+                    ? t.passingMarks
+                    : 'None'}
                 </p>
               </div>
 
@@ -1221,6 +1225,10 @@ function TestsTab() {
                   setF({
                     ...blankT,
                     ...t,
+                    resultsEnabled: t.resultsEnabled === true || Number(t.passingMarks) > 0,
+                    passingMarks: t.resultsEnabled !== true && Number(t.passingMarks) === 0
+                      ? null
+                      : t.passingMarks,
                     domainId: t.domainId?._id || '',
                     questions:
                       t.questions?.map((q) => q._id || q) || [],

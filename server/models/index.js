@@ -42,6 +42,7 @@ const testSchema = new Schema({
   description: { type: String, trim: true, maxlength: 5000, default: '' },
   domainId: { type: Schema.Types.ObjectId, ref: 'Domain', required: true, index: true },
   durationMinutes: { type: Number, required: true, min: 1, max: 1440 },
+  resultsEnabled: { type: Boolean },
   passingMarks: { type: Number, min: 0, default: null },
   questions: [{ type: Schema.Types.ObjectId, ref: 'Question' }],
   isActive: { type: Boolean, default: true, index: true },
