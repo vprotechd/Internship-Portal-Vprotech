@@ -341,7 +341,9 @@ function DomainsTab() {
       load();
       toast(`Domain ${edit ? 'updated' : 'created'} successfully.`);
     } catch (e) {
-      setErr(msg(e));
+      const message = msg(e);
+      setErr(message);
+      toast(message, 'error');
     } finally {
       setSaving(false);
     }
@@ -634,17 +636,18 @@ function QuestionsTab() {
     }
   };
 
-  const del = async (q) => {
-    if (!confirm('Delete question?')) return;
-
-    try {
-      await api.delete(`/admin/questions/${q._id}`);
-      load();
-      toast('Question deleted successfully.');
-    } catch (e) {
-      setErr(msg(e));
-      toast(msg(e), 'error');
-    }
+  const del = (q) => {
+    toast('Delete this question?', 'confirm', async () => {
+      try {
+        await api.delete(`/admin/questions/${q._id}`);
+        load();
+        toast('Question deleted successfully.');
+      } catch (e) {
+        const message = msg(e);
+        setErr(message);
+        toast(message, 'error');
+      }
+    });
   };
 
   return (
@@ -935,7 +938,9 @@ function TestsTab() {
       load();
       toast(`Test ${id ? 'updated' : 'created'} successfully.`);
     } catch (x) {
-      setErr(msg(x));
+      const message = msg(x);
+      setErr(message);
+      toast(message, 'error');
     } finally {
       setSaving(false);
     }
@@ -949,23 +954,22 @@ function TestsTab() {
         : [...v.questions, qid],
     }));
 
-  const del = async (t) => {
-    if (
-      !confirm(
-        'Delete test? Existing submitted tests cannot be deleted.'
-      )
-    ) {
-      return;
-    }
-
-    try {
-      await api.delete(`/admin/tests/${t._id}`);
-      load();
-      toast('Test deleted successfully.');
-    } catch (e) {
-      setErr(msg(e));
-      toast(msg(e), 'error');
-    }
+  const del = (t) => {
+    toast(
+      'Delete test? Existing submitted tests cannot be deleted.',
+      'confirm',
+      async () => {
+        try {
+          await api.delete(`/admin/tests/${t._id}`);
+          load();
+          toast('Test deleted successfully.');
+        } catch (e) {
+          const message = msg(e);
+          setErr(message);
+          toast(message, 'error');
+        }
+      }
+    );
   };
 
   const release = async (t) => {

@@ -82,8 +82,21 @@ r.post('/login', wrap(async (req, res) => {
   res.json({ success: true, user: pub(u) });
 }));
 
-r.get('/me', auth(), wrap(async (req, res) => {
-  const u = await User.findById(req.user._id).populate('domainId', 'name');
+r.get('/me', wrap(async (req, res) => {
+  const token = req.cookies?.token;
+  if (!token) return res.json({ success: true, user: null });
+
+  let payload;
+  try {
+    payload = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError)
+      return res.json({ success: true, user: null });
+    throw error;
+  }
+
+  const u = await User.findById(payload.id).populate('domainId', 'name');
+  if (!u) return res.json({ success: true, user: null });
   res.json({ success: true, user: pub(u) });
 }));
 

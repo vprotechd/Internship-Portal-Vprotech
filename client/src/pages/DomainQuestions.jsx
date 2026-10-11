@@ -36,6 +36,7 @@ export default function DomainQuestions() {
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -117,20 +118,27 @@ export default function DomainQuestions() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const remove = async (q) => {
-    if (!confirm('Delete this question?')) return;
+  const remove = (q) => {
+    setConfirmDelete(q);
+  };
+
+  const confirmRemove = async () => {
+    if (!confirmDelete) return;
+
     setErr('');
     setOk('');
     try {
-      await api.delete(`/admin/questions/${q._id}`);
-      if (editId === q._id) {
+      await api.delete(`/admin/questions/${confirmDelete._id}`);
+      if (editId === confirmDelete._id) {
         setEditId(null);
         setF(blank);
       }
       setOk('Question deleted.');
+      setConfirmDelete(null);
       await load();
     } catch (x) {
       setErr(msg(x));
+      setConfirmDelete(null);
     }
   };
 
@@ -167,6 +175,28 @@ export default function DomainQuestions() {
 
         {domain && (
           <div className="grid lg:grid-cols-2 gap-4">
+            {confirmDelete && (
+              <div className="lg:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <span>Delete this question?</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded-lg border border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
+                    onClick={() => setConfirmDelete(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded-lg bg-red-700 text-white hover:bg-red-800"
+                    onClick={confirmRemove}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={submit} className={`${card} space-y-3 self-start`}>
               <h2 className="font-semibold text-slate-800">
                 {editId ? 'Edit Question' : `Add Question to ${domain.name}`}

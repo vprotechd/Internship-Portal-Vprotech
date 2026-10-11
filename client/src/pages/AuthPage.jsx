@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { msg } from '../api';
+import vproLogo from '../assets/vprologo.png';
 
 const inp =
   'w-full border border-slate-200 rounded-xl pl-11 pr-11 py-3 text-sm bg-slate-50/70 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-400 focus:bg-white transition-all duration-200';
@@ -201,7 +202,6 @@ export default function AuthPage({ initialMode = 'login' }) {
 
           <div className="relative">
             <div className="inline-flex items-center gap-2 bg-white/10 border border-white/10 px-3 py-2 rounded-xl text-sm mb-8">
-             
               VProTech Assessment Portal
             </div>
 
@@ -251,22 +251,19 @@ export default function AuthPage({ initialMode = 'login' }) {
 
         {/* Right form */}
         <div className="p-6 sm:p-8 lg:p-10 xl:p-12">
-          {/* Mobile branding */}
-          <div className="lg:hidden mb-7">
+          {/* Branding */}
+          <div className="mb-7">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-slate-800 text-white flex items-center justify-center shadow-lg">
-                <ShieldCheck size={23} />
-              </div>
-
-              <div>
-                <h1 className="font-bold text-slate-900">
-                  VProTech Assessment
-                </h1>
-                <p className="text-xs text-slate-500">
-                  Student Portal
-                </p>
-              </div>
+              <img
+                src={vproLogo}
+                alt="VProTech Digital Logo"
+                className="w-40 lg:w-56 h-auto object-contain"
+              />
             </div>
+
+            <p className="text-xs text-slate-500 mt-2">
+              Student Assessment Portal
+            </p>
           </div>
 
           {/* Header */}
