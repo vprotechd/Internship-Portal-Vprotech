@@ -1547,8 +1547,12 @@ function ResultsTab() {
                 (r.score || 0) +
                 (r.manualScore || 0);
 
+              const hasPassingMark =
+                r.resultsEnabled === true ||
+                Number(r.passingMarks) > 0;
               const pass =
-                total >= (r.passingMarks || 0);
+                hasPassingMark &&
+                total >= Number(r.passingMarks);
 
               return (
                 <tr
@@ -1578,17 +1582,19 @@ function ResultsTab() {
                   </td>
 
                   <td className="pr-4">
-                    {r.passingMarks}
+                    {hasPassingMark ? r.passingMarks : '—'}
                   </td>
 
                   <td
                     className={`pr-4 font-medium ${
-                      pass
-                        ? 'text-emerald-700'
-                        : 'text-red-700'
+                      !hasPassingMark
+                        ? 'text-slate-400'
+                        : pass
+                          ? 'text-emerald-700'
+                          : 'text-red-700'
                     }`}
                   >
-                    {pass ? 'Pass' : 'Fail'}
+                    {hasPassingMark ? (pass ? 'Pass' : 'Fail') : '—'}
                   </td>
 
                   <td className="pr-4">

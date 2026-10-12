@@ -84,6 +84,7 @@ r.get('/dashboard', wrap(async (req, res) => {
       { $match: { status: { $in: ['submitted', 'auto-submitted'] } } },
       { $lookup: { from: 'tests', localField: 'testId', foreignField: '_id', as: 'test' } },
       { $unwind: '$test' },
+      { $match: { $or: [{ 'test.resultsEnabled': true }, { 'test.passingMarks': { $gt: 0 } }] } },
       { $match: { $expr: { $gte: [{ $add: ['$score', '$manualScore'] }, '$test.passingMarks'] } } },
       { $count: 'n' },
     ]),
@@ -91,6 +92,7 @@ r.get('/dashboard', wrap(async (req, res) => {
       { $match: { status: { $in: ['submitted', 'auto-submitted'] } } },
       { $lookup: { from: 'tests', localField: 'testId', foreignField: '_id', as: 'test' } },
       { $unwind: '$test' },
+      { $match: { $or: [{ 'test.resultsEnabled': true }, { 'test.passingMarks': { $gt: 0 } }] } },
       { $match: { $expr: { $lt: [{ $add: ['$score', '$manualScore'] }, '$test.passingMarks'] } } },
       { $count: 'n' },
     ]),
@@ -291,6 +293,7 @@ r.get('/results', wrap(async (req, res) => {
     { $project: {
       _id: 1, score: 1, manualScore: 1, reviewed: 1, status: 1, tabSwitchCount: 1,
       startedAt: 1, submittedAt: 1, passingMarks: '$test.passingMarks',
+      resultsEnabled: '$test.resultsEnabled',
       student: { name: 1, email: 1, phone: 1, collegeName: 1, branch: 1, semester: 1 },
       domain: { name: 1 }, test: { title: 1 },
     } },
@@ -303,6 +306,7 @@ r.get('/results', wrap(async (req, res) => {
     { $lookup: { from: 'tests', localField: 'testId', foreignField: '_id', as: 'test' } },
     { $unwind: '$test' },
     { $match: { status: { $in: ['submitted', 'auto-submitted'] } } },
+    { $match: { $or: [{ 'test.resultsEnabled': true }, { 'test.passingMarks': { $gt: 0 } }] } },
     { $group: { _id: null, passed: { $sum: { $cond: [{ $gte: [{ $add: ['$score', '$manualScore'] }, '$test.passingMarks'] }, 1, 0] } }, failed: { $sum: { $cond: [{ $lt: [{ $add: ['$score', '$manualScore'] }, '$test.passingMarks'] }, 1, 0] } } } },
   ]);
   res.json({ rows, page, pages: Math.max(1, Math.ceil(total / LIMIT)), total, completed, stats: allForPass[0] || { passed: 0, failed: 0 } });
@@ -311,7 +315,7 @@ r.get('/results', wrap(async (req, res) => {
 r.get('/results/export.csv', wrap(async (req, res) => {
   await expireOldAttempts();
   const match = resultMatch(req.query);
-  const cursor = Submission.find(match).populate({ path: 'studentId', select: 'name email phone collegeName branch semester domainId', populate: { path: 'domainId', select: 'name' } }).populate('testId', 'title passingMarks').sort({ submittedAt: -1 }).lean().cursor();
+  const cursor = Submission.find(match).populate({ path: 'studentId', select: 'name email phone collegeName branch semester domainId', populate: { path: 'domainId', select: 'name' } }).populate('testId', 'title passingMarks resultsEnabled').sort({ submittedAt: -1 }).lean().cursor();
   const esc = (v) => {
     const t = String(v ?? '');
     const safe = /^[=+\-@]/.test(t) ? `'${t}` : t;
@@ -322,7 +326,8 @@ r.get('/results/export.csv', wrap(async (req, res) => {
   for await (const s of cursor) {
     const u = s.studentId || {}, t = s.testId || {};
     const total = Number(s.score || 0) + Number(s.manualScore || 0);
-    const row = [u.name, u.email, u.phone, u.collegeName, u.branch, u.semester, u.domainId?.name, t.title, total, t.passingMarks, total >= t.passingMarks ? 'Pass' : 'Fail', s.status, s.tabSwitchCount, s.submittedAt?.toISOString()];
+    const hasPassingMark = t.resultsEnabled === true || Number(t.passingMarks) > 0;
+    const row = [u.name, u.email, u.phone, u.collegeName, u.branch, u.semester, u.domainId?.name, t.title, total, hasPassingMark ? t.passingMarks : '', hasPassingMark ? (total >= Number(t.passingMarks) ? 'Pass' : 'Fail') : '', s.status, s.tabSwitchCount, s.submittedAt?.toISOString()];
     res.write(row.map(esc).join(',') + '\n');
   }
   res.end();
