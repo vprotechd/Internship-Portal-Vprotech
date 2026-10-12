@@ -357,7 +357,7 @@ r.get('/users', wrap(async (req, res) => {
   if (q) { const rx = safeRx(q); filter.$or = [{ name: rx }, { email: rx }, { collegeName: rx }]; }
   if (validId(req.query.domainId)) filter.domainId = req.query.domainId;
   const [rows, total] = await Promise.all([
-    User.find(filter).select('name email phone collegeName domainId role createdAt').populate('domainId', 'name').sort('-createdAt').skip((page - 1) * LIMIT).limit(LIMIT).lean(),
+    User.find(filter).select('name email phone collegeName branch semester domainId role createdAt').populate('domainId', 'name').sort('-createdAt').skip((page - 1) * LIMIT).limit(LIMIT).lean(),
     User.countDocuments(filter),
   ]);
   res.json({ rows, page, pages: Math.max(1, Math.ceil(total / LIMIT)), total });

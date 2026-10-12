@@ -1826,6 +1826,8 @@ function StudentsTab() {
         'Email',
         'Phone',
         'College',
+        'Branch',
+        'Semester',
         'Domain',
         'Registered Date',
       ];
@@ -1845,6 +1847,8 @@ function StudentsTab() {
               <td>${excelSafe(student.email)}</td>
               <td>${excelSafe(student.phone)}</td>
               <td>${excelSafe(student.collegeName)}</td>
+              <td>${excelSafe(student.branch)}</td>
+              <td>${excelSafe(student.semester)}</td>
               <td>${excelSafe(
                 student.domainId?.name ||
                   'No domain'
@@ -2089,7 +2093,7 @@ function StudentsTab() {
       {/* Student table */}
       <div className={`${card} p-0 overflow-hidden`}>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left min-w-[1000px]">
+          <table className="w-full text-sm text-left min-w-[1200px]">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="px-4 py-3 font-semibold text-slate-600">
@@ -2110,6 +2114,14 @@ function StudentsTab() {
 
                 <th className="px-4 py-3 font-semibold text-slate-600">
                   College
+                </th>
+
+                <th className="px-4 py-3 font-semibold text-slate-600">
+                  Branch
+                </th>
+
+                <th className="px-4 py-3 font-semibold text-slate-600">
+                  Semester
                 </th>
 
                 <th className="px-4 py-3 font-semibold text-slate-600">
@@ -2135,7 +2147,7 @@ function StudentsTab() {
                       </td>
 
                       {Array.from({
-                        length: 6,
+                        length: 8,
                       }).map((__, i) => (
                         <td
                           key={i}
@@ -2214,6 +2226,14 @@ function StudentsTab() {
                         >
                           {u.collegeName || '—'}
                         </span>
+                      </td>
+
+                      <td className="px-4 py-4 text-slate-600">
+                        {u.branch || '—'}
+                      </td>
+
+                      <td className="px-4 py-4 text-slate-600">
+                        {u.semester || '—'}
                       </td>
 
                       <td className="px-4 py-4">
