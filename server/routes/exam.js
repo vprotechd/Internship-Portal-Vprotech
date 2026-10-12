@@ -74,37 +74,98 @@ r.get('/tests/:id', wrap(async (req, res) => {
 
 r.post('/tests/:id/start', wrap(async (req, res) => {
   let s = await loadAttempt(req.params.id, req.user._id);
-  let test = await getTestForStudent(req.params.id, req.user, Boolean(!s || s.status !== 'in-progress'));
-  if (!test) return res.status(404).json({ success: false, message: 'Test is not available for your domain' });
+
+  let test = await getTestForStudent(
+    req.params.id,
+    req.user,
+    Boolean(!s || s.status !== 'in-progress')
+  );
+
+  if (!test) {
+    return res.status(404).json({
+      success: false,
+      message: 'Test is not available for your domain',
+    });
+  }
 
   if (s?.status !== 'in-progress') {
-    if (s) return res.status(409).json({ success: false, message: 'You have already submitted this test' });
+    if (s) {
+      return res.status(409).json({
+        success: false,
+        message: 'You have already submitted this test',
+      });
+    }
+
     const now = new Date();
-    const randomizedQuestions = [...test.questions].sort(() => Math.random() - 0.5);
+
+    // Shuffle questions independently for this student's attempt.
+    const randomizedQuestions = [...test.questions];
+
+    for (let i = randomizedQuestions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+
+      [randomizedQuestions[i], randomizedQuestions[j]] = [
+        randomizedQuestions[j],
+        randomizedQuestions[i],
+      ];
+    }
+
+    // Create and save the attempt with the randomized question order.
     s = await Submission.create({
-      questionOrder: randomizedQuestions.map((q) => q._id),
-      studentId: req.user._id,
       testId: test._id,
+      studentId: req.user._id,
+      status: 'in-progress',
       startedAt: now,
-      deadline: new Date(now.getTime() + test.durationMinutes * 60000),
+      deadline: new Date(
+        now.getTime() + test.durationMinutes * 60 * 1000
+      ),
+      questionOrder: randomizedQuestions.map((q) => q._id),
+      answers: {},
+      score: 0,
+      tabSwitchCount: 0,
     });
+
+    test.questions = randomizedQuestions;
   } else {
     s = await finalizeExpired(s, test);
-    if (s.status !== 'in-progress')
-      return res.status(409).json({ success: false, message: 'Test time has expired and the test was submitted' });
+
+    if (s.status !== 'in-progress') {
+      return res.status(409).json({
+        success: false,
+        message: 'Test time has expired and the test was submitted',
+      });
+    }
+
+    // Restore this student's original question order when resuming.
+    if (s.questionOrder?.length) {
+      const byId = new Map(
+        test.questions.map((q) => [String(q._id), q])
+      );
+
+      test.questions = s.questionOrder
+        .map((id) => byId.get(String(id)))
+        .filter(Boolean);
+    }
   }
 
-  if (s.questionOrder?.length) {
-    const byId = new Map(test.questions.map((q) => [String(q._id), q]));
-    test.questions = s.questionOrder.map((id) => byId.get(String(id))).filter(Boolean);
-  }
   res.json({
     success: true,
-    test: { ...test.toObject(), questions: safeQuestions(test.questions) },
+    test: {
+      ...test.toObject(),
+      questions: safeQuestions(test.questions),
+    },
     deadline: s.deadline,
-    remainingSeconds: Math.max(0, Math.ceil((new Date(s.deadline).getTime() - Date.now()) / 1000)),
+    remainingSeconds: Math.max(
+      0,
+      Math.ceil(
+        (new Date(s.deadline).getTime() - Date.now()) / 1000
+      )
+    ),
     tabSwitchCount: s.tabSwitchCount,
-    answers: (s.answers instanceof Map ? Object.fromEntries(s.answers) : (s.answers || {})),
+    answers:
+      s.answers instanceof Map
+        ? Object.fromEntries(s.answers)
+        : s.answers || {},
   });
 }));
 
