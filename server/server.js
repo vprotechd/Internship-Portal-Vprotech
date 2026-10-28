@@ -329,10 +329,6 @@ const startServer = async () => {
 
     const defaultDomains = [
       'MERN Stack',
-      '.NET',
-      'Java',
-      'Python',
-      'Frontend Development',
       'Full Stack Development',
     ];
 
