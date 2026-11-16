@@ -101,7 +101,7 @@ r.get('/me', wrap(async (req, res) => {
 }));
 
 r.post('/logout', (req, res) => {
-  res.clearCookie('token', cookieOptions);
+ res.clearCookie('token', { ...cookieOptions, maxAge: undefined });
   res.json({ success: true, message: 'Logged out' });
 });
 

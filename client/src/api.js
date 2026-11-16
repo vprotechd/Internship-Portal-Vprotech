@@ -14,25 +14,28 @@ import axios from 'axios';
 |--------------------------------------------------------------------------
 */
 
+
 const getApiBaseUrl = () => {
   const configuredUrl = import.meta.env.VITE_API_URL?.trim();
+
+  // Use configured API URL in both local and production environments
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/+$/, '');
+  }
+
   const isLocal =
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1');
 
-  if (configuredUrl) {
-    const normalizedUrl = configuredUrl.replace(/\/+$/, '');
-    if (isLocal) return normalizedUrl;
-  }
-
   if (isLocal) {
     return 'http://localhost:5000/api';
   }
 
-  // Production
+  // Production fallback
   return '/api';
 };
+
 
 const API_BASE_URL = getApiBaseUrl();
 
