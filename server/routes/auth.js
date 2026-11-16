@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Domain, User } from '../models/index.js';
-import { auth, wrap } from '../middleware/auth.js';
+import { auth, wrap, getToken } from '../middleware/auth.js';
 
 const r = Router();
 
@@ -14,11 +14,8 @@ const cookieOptions = {
   maxAge: 24 * 60 * 60 * 1000,
 };
 
-const setCookie = (res, u) => res.cookie(
-  'token',
-  jwt.sign({ id: u._id, role: u.role }, process.env.JWT_SECRET, { expiresIn: '1d' }),
-  cookieOptions
-);
+const signToken = (u) =>
+  jwt.sign({ id: u._id, role: u.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
 const pub = (u) => ({
   id: u._id,
@@ -78,12 +75,13 @@ r.post('/login', wrap(async (req, res) => {
   if (!u || !(await bcrypt.compare(password, u.passwordHash)))
     return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
-  setCookie(res, u);
-  res.json({ success: true, user: pub(u) });
+  const token = signToken(u);
+  res.cookie('token', token, cookieOptions);
+  res.json({ success: true, user: pub(u), token });
 }));
 
 r.get('/me', wrap(async (req, res) => {
-  const token = req.cookies?.token;
+  const token = getToken(req);
   if (!token) return res.json({ success: true, user: null });
 
   let payload;
@@ -101,7 +99,7 @@ r.get('/me', wrap(async (req, res) => {
 }));
 
 r.post('/logout', (req, res) => {
- res.clearCookie('token', { ...cookieOptions, maxAge: undefined });
+  res.clearCookie('token', { ...cookieOptions, maxAge: undefined });
   res.json({ success: true, message: 'Logged out' });
 });
 

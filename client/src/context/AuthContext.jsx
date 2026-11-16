@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import api from '../api';
+import api, { setStoredToken } from '../api';
 
 const Ctx = createContext(null);
 export const useAuth = () => useContext(Ctx);
@@ -10,7 +10,11 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     api.get('/auth/me')
-      .then((r) => setUser(r.data.user))
+      .then((r) => {
+        setUser(r.data.user);
+        // Token invalid/expired ho to saaf kar do
+        if (!r.data.user) setStoredToken(null);
+      })
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
@@ -27,6 +31,8 @@ export function AuthProvider({ children }) {
       );
     }
 
+    // Token save karo, taaki agli requests mein Authorization header jaye
+    setStoredToken(data.token || null);
     setUser(authenticatedUser);
     return authenticatedUser;
   };
@@ -43,8 +49,17 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    try { await api.post('/auth/logout'); } finally { setUser(null); }
+    try {
+      await api.post('/auth/logout');
+    } finally {
+      setStoredToken(null);
+      setUser(null);
+    }
   };
 
-  return <Ctx.Provider value={{ user, loading, login, register, selectDomain, logout }}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={{ user, loading, login, register, selectDomain, logout }}>
+      {children}
+    </Ctx.Provider>
+  );
 }
