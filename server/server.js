@@ -96,6 +96,11 @@ app.use(cookieParser());
 
 app.use(helmet());
 
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+
 /*
 |--------------------------------------------------------------------------
 | Rate Limiting
@@ -374,12 +379,16 @@ const startServer = async () => {
 
         phone: '0000000000',
 
+        branch: 'NA',
+
+        semester: 'NA',
+
         role: 'admin',
 
         passwordHash:
           await bcrypt.hash(
             ADMIN_PASSWORD,
-            12
+            10
           ),
       });
 

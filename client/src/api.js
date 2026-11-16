@@ -8,7 +8,7 @@ import axios from 'axios';
 |   http://localhost:5000/api
 |
 | Production:
-|   https://internship-portal-vprotech1.onrender.com/api
+|   /api (same-origin Render rewrite)
 |
 | VITE_API_URL can override the default URL when required.
 |--------------------------------------------------------------------------
@@ -23,12 +23,7 @@ const getApiBaseUrl = () => {
 
   if (configuredUrl) {
     const normalizedUrl = configuredUrl.replace(/\/+$/, '');
-    if (/^https?:\/\//i.test(normalizedUrl) || isLocal) return normalizedUrl;
-
-    return new URL(
-      normalizedUrl,
-      'https://internship-portal-vprotech1.onrender.com/'
-    ).toString().replace(/\/+$/, '');
+    if (isLocal) return normalizedUrl;
   }
 
   if (isLocal) {
@@ -36,7 +31,7 @@ const getApiBaseUrl = () => {
   }
 
   // Production
-  return 'https://internship-portal-vprotech1.onrender.com/api';
+  return '/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -57,7 +52,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 
-  timeout: 30000,
+  timeout: 60000,
 });
 
 /*

@@ -8,16 +8,21 @@ export default function useTabGuard(enabled, onViolation) {
   useEffect(() => {
     if (!enabled) return;
     let last = 0;
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     const fire = () => { const now = Date.now(); if (now - last > 1000) { last = now; cb.current(); } };
     const onVis = () => document.hidden && fire();
     const onFs = () => !document.fullscreenElement && fire();
     document.addEventListener('visibilitychange', onVis);
-    window.addEventListener('blur', fire);
-    document.addEventListener('fullscreenchange', onFs);
+    if (!isMobile) {
+      window.addEventListener('blur', fire);
+      document.addEventListener('fullscreenchange', onFs);
+    }
     return () => {
       document.removeEventListener('visibilitychange', onVis);
-      window.removeEventListener('blur', fire);
-      document.removeEventListener('fullscreenchange', onFs);
+      if (!isMobile) {
+        window.removeEventListener('blur', fire);
+        document.removeEventListener('fullscreenchange', onFs);
+      }
     };
   }, [enabled]);
 }

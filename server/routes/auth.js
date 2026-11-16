@@ -8,10 +8,10 @@ const r = Router();
 
 const cookieOptions = {
   httpOnly: true,
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  sameSite: 'lax',
   secure: process.env.NODE_ENV === 'production',
-  maxAge: 864e5,
   path: '/',
+  maxAge: 24 * 60 * 60 * 1000,
 };
 
 const setCookie = (res, u) => res.cookie(
@@ -60,7 +60,7 @@ r.post('/register', wrap(async (req, res) => {
 
   await User.create({
     name, email, phone, collegeName, branch, semester,
-    passwordHash: await bcrypt.hash(password, 12),
+    passwordHash: await bcrypt.hash(password, 10),
     role: 'student',
   });
 
@@ -101,7 +101,7 @@ r.get('/me', wrap(async (req, res) => {
 }));
 
 r.post('/logout', (req, res) => {
-  res.clearCookie('token', { ...cookieOptions, maxAge: undefined });
+  res.clearCookie('token', cookieOptions);
   res.json({ success: true, message: 'Logged out' });
 });
 
