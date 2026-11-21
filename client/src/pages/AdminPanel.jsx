@@ -1405,10 +1405,14 @@ function ReviewPanel({
 
 function ResultsTab() {
   const [tests] = useList('/admin/tests');
+  const toast = useToast();
 
   const [filter, setFilter] = useState('');
   const [q, setQ] = useState('');
+  const [college, setCollege] = useState('');
+  const [date, setDate] = useState('');
   const [page, setPage] = useState(1);
+  const [error, setError] = useState('');
 
   const [data, setData] = useState({
     rows: [],
@@ -1419,19 +1423,31 @@ function ResultsTab() {
   const [review, setReview] = useState(null);
   const [exporting, setExporting] = useState(false);
 
+  const resultFilterParams = useCallback(
+    (requestedPage) => ({
+      testId: filter || undefined,
+      q: q || undefined,
+      college: college || undefined,
+      date: date || undefined,
+      page: requestedPage,
+    }),
+    [filter, q, college, date]
+  );
+
   const load = useCallback(
-    () =>
-      api
-        .get('/admin/results', {
-          params: {
-            testId: filter || undefined,
-            q: q || undefined,
-            page,
-          },
-        })
-        .then((r) => setData(r.data))
-        .catch(() => {}),
-    [filter, q, page]
+    async () => {
+      try {
+        setError('');
+        const response = await api.get('/admin/results', {
+          params: resultFilterParams(page),
+        });
+        setData(response.data);
+      } catch (e) {
+        setData({ rows: [], pages: 1, total: 0, completed: 0, stats: {} });
+        setError(msg(e));
+      }
+    },
+    [resultFilterParams, page]
   );
 
   useEffect(() => {
@@ -1443,9 +1459,7 @@ function ResultsTab() {
 
     try {
       const response = await api.get('/admin/results/export.csv', {
-        params: {
-          testId: filter || undefined,
-        },
+        params: resultFilterParams(),
         responseType: 'blob',
       });
       const url = window.URL.createObjectURL(response.data);
@@ -1497,6 +1511,44 @@ function ResultsTab() {
           }}
         />
 
+        <input
+          className={`${inp} max-w-xs`}
+          placeholder="Filter by college"
+          aria-label="Filter results by college"
+          value={college}
+          onChange={(e) => {
+            setCollege(e.target.value);
+            setPage(1);
+          }}
+        />
+
+        <label className="space-y-1 text-xs font-medium text-slate-600">
+          Submission date
+          <input
+            className={inp}
+            type="date"
+            value={date}
+            onChange={(e) => {
+              setDate(e.target.value);
+              setPage(1);
+            }}
+          />
+        </label>
+
+        <button
+          type="button"
+          className="px-3 py-2 rounded-lg border text-sm hover:bg-slate-50 transition"
+          onClick={() => {
+            setFilter('');
+            setQ('');
+            setCollege('');
+            setDate('');
+            setPage(1);
+          }}
+        >
+          Clear Filters
+        </button>
+
         <button
           type="button"
           className={`${btn} flex items-center gap-1`}
@@ -1507,6 +1559,12 @@ function ResultsTab() {
           {exporting ? 'Exporting...' : 'Export CSV'}
         </button>
       </div>
+
+      {error && (
+        <p role="alert" className="text-sm text-red-700 bg-red-50 rounded-lg p-3">
+          {error}
+        </p>
+      )}
 
       <div className="text-sm text-slate-600">
         Attempts: {data.total || 0} · Completed:{' '}
@@ -1681,6 +1739,8 @@ function StudentsTab() {
 
   const [q, setQ] = useState('');
   const [domainId, setDomainId] = useState('');
+  const [college, setCollege] = useState('');
+  const [date, setDate] = useState('');
   const [page, setPage] = useState(1);
 
   const [data, setData] = useState({
@@ -1693,17 +1753,24 @@ function StudentsTab() {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
 
+  const studentFilterParams = useCallback(
+    (requestedPage) => ({
+      q: q || undefined,
+      domainId: domainId || undefined,
+      college: college || undefined,
+      date: date || undefined,
+      page: requestedPage,
+    }),
+    [q, domainId, college, date]
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
       const r = await api.get('/admin/users', {
-        params: {
-          q: q || undefined,
-          domainId: domainId || undefined,
-          page,
-        },
+        params: studentFilterParams(page),
       });
 
       setData(
@@ -1718,7 +1785,7 @@ function StudentsTab() {
     } finally {
       setLoading(false);
     }
-  }, [q, domainId, page]);
+  }, [studentFilterParams, page]);
 
   useEffect(() => {
     const t = setTimeout(load, 250);
@@ -1781,16 +1848,9 @@ function StudentsTab() {
     setError('');
 
     try {
-      const firstResponse = await api.get(
-        '/admin/users',
-        {
-          params: {
-            q: q || undefined,
-            domainId: domainId || undefined,
-            page: 1,
-          },
-        }
-      );
+      const firstResponse = await api.get('/admin/users', {
+        params: studentFilterParams(1),
+      });
 
       const firstData = firstResponse.data || {};
 
@@ -1804,16 +1864,9 @@ function StudentsTab() {
       );
 
       for (let currentPage = 2; currentPage <= totalPages; currentPage += 1) {
-        const response = await api.get(
-          '/admin/users',
-          {
-            params: {
-              q: q || undefined,
-              domainId: domainId || undefined,
-              page: currentPage,
-            },
-          }
-        );
+        const response = await api.get('/admin/users', {
+          params: studentFilterParams(currentPage),
+        });
 
         allStudents = [
           ...allStudents,
@@ -1952,6 +2005,9 @@ function StudentsTab() {
   const clearFilters = () => {
     setQ('');
     setDomainId('');
+    setCollege('');
+    setDateFrom('');
+    setDateTo('');
     setPage(1);
   };
 
@@ -2020,7 +2076,7 @@ function StudentsTab() {
           </h3>
         </div>
 
-        <div className="grid md:grid-cols-[1fr_240px_auto] gap-2">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
           <div className="relative">
             <Search
               size={17}
@@ -2037,6 +2093,17 @@ function StudentsTab() {
               }}
             />
           </div>
+
+          <input
+            className={inp}
+            placeholder="Filter by college"
+            aria-label="Filter by college"
+            value={college}
+            onChange={(e) => {
+              setCollege(e.target.value);
+              setPage(1);
+            }}
+          />
 
           <select
             className={inp}
@@ -2060,10 +2127,23 @@ function StudentsTab() {
             ))}
           </select>
 
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            Registration date
+            <input
+              className={inp}
+              type="date"
+              value={date}
+              onChange={(e) => {
+                setDate(e.target.value);
+                setPage(1);
+              }}
+            />
+          </label>
+
           <button
             type="button"
             onClick={clearFilters}
-            className="px-3 py-2 rounded-lg border text-sm hover:bg-slate-50 transition"
+            className="self-end px-3 py-2 rounded-lg border text-sm hover:bg-slate-50 transition"
           >
             Clear Filters
           </button>

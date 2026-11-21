@@ -12,7 +12,20 @@ const validId = (id) => mongoose.isValidObjectId(id);
 const text = (v, max = 10000) => String(v ?? '').trim().slice(0, max);
 const pageInfo = (v) => Math.max(1, Number.parseInt(v, 10) || 1);
 const safeRx = (v) => new RegExp(String(v || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-
+const getDateRange = (value) => {
+  if (!value) return { range: null };
+  const dateValue = text(value, 11);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    return { error: 'Invalid date filter' };
+  }
+  const date = new Date(`${dateValue}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== dateValue) {
+    return { error: 'Invalid date filter' };
+  }
+  const dayAfter = new Date(date);
+  dayAfter.setUTCDate(dayAfter.getUTCDate() + 1);
+  return { range: { $gte: date, $lt: dayAfter } };
+};
 const expireOldAttempts = async () => {
   const now = new Date();
   const expired = await Submission.find({ status: 'in-progress', deadline: { $lte: now } }).select('_id testId answers').limit(500);
@@ -265,22 +278,41 @@ const resultMatch = (query) => {
   return match;
 };
 
+const getResultMatch = async (query) => {
+  const match = resultMatch(query);
+  const dateRange = getDateRange(query.date);
+  if (dateRange.error) return { error: dateRange.error };
+  if (dateRange.range) match.submittedAt = dateRange.range;
+
+  const q = text(query.q, 100);
+  const college = text(query.college, 150);
+  if (q || college) {
+    const studentFilter = { role: 'student' };
+    if (college) studentFilter.collegeName = safeRx(college);
+    if (q) {
+      const rx = safeRx(q);
+      studentFilter.$or = [{ name: rx }, { email: rx }, { collegeName: rx }];
+    }
+
+    const studentIds = await User.find(studentFilter).distinct('_id');
+    match.studentId = match.studentId
+      ? { $in: studentIds.filter((id) => String(id) === String(match.studentId)) }
+      : { $in: studentIds };
+  }
+  return { match };
+};
+
 r.get('/results', wrap(async (req, res) => {
   await expireOldAttempts();
   const page = pageInfo(req.query.page);
-  const match = resultMatch(req.query);
-  const q = text(req.query.q, 100);
-  const pipeline = [{ $match: match }];
-  if (q) {
-    pipeline.push(
-      { $lookup: { from: 'users', localField: 'studentId', foreignField: '_id', as: 'student' } },
-      { $unwind: '$student' },
-      { $match: { $or: [{ 'student.name': safeRx(q) }, { 'student.email': safeRx(q) }, { 'student.collegeName': safeRx(q) }] } }
-    );
+  const resultFilter = await getResultMatch(req.query);
+  if (resultFilter.error) {
+    return res.status(400).json({ success: false, message: resultFilter.error });
   }
-  const base = [...pipeline, { $count: 'n' }];
+  const { match } = resultFilter;
+  const base = [{ $match: match }, { $count: 'n' }];
   const dataPipeline = [
-    ...pipeline,
+    { $match: match },
     { $sort: { submittedAt: -1, _id: -1 } },
     { $skip: (page - 1) * LIMIT },
     { $limit: LIMIT },
@@ -302,7 +334,7 @@ r.get('/results', wrap(async (req, res) => {
   const total = countRows[0]?.n || 0;
   const completed = await Submission.countDocuments({ ...match, status: { $in: ['submitted', 'auto-submitted'] } });
   const allForPass = await Submission.aggregate([
-    ...pipeline,
+    { $match: match },
     { $lookup: { from: 'tests', localField: 'testId', foreignField: '_id', as: 'test' } },
     { $unwind: '$test' },
     { $match: { status: { $in: ['submitted', 'auto-submitted'] } } },
@@ -314,7 +346,11 @@ r.get('/results', wrap(async (req, res) => {
 
 r.get('/results/export.csv', wrap(async (req, res) => {
   await expireOldAttempts();
-  const match = resultMatch(req.query);
+  const resultFilter = await getResultMatch(req.query);
+  if (resultFilter.error) {
+    return res.status(400).json({ success: false, message: resultFilter.error });
+  }
+  const { match } = resultFilter;
   const cursor = Submission.find(match).populate({ path: 'studentId', select: 'name email phone collegeName branch semester domainId', populate: { path: 'domainId', select: 'name' } }).populate('testId', 'title passingMarks resultsEnabled').sort({ submittedAt: -1 }).lean().cursor();
   const esc = (v) => {
     const t = String(v ?? '');
@@ -358,9 +394,16 @@ r.put('/results/:id/grade', wrap(async (req, res) => {
 r.get('/users', wrap(async (req, res) => {
   const page = pageInfo(req.query.page);
   const q = text(req.query.q, 100);
+  const college = text(req.query.college, 150);
   const filter = { role: 'student' };
   if (q) { const rx = safeRx(q); filter.$or = [{ name: rx }, { email: rx }, { collegeName: rx }]; }
   if (validId(req.query.domainId)) filter.domainId = req.query.domainId;
+  if (college) filter.collegeName = safeRx(college);
+  const registrationDate = getDateRange(req.query.date);
+  if (registrationDate.error) {
+    return res.status(400).json({ success: false, message: registrationDate.error });
+  }
+  if (registrationDate.range) filter.createdAt = registrationDate.range;
   const [rows, total] = await Promise.all([
     User.find(filter).select('name email phone collegeName branch semester domainId role createdAt').populate('domainId', 'name').sort('-createdAt').skip((page - 1) * LIMIT).limit(LIMIT).lean(),
     User.countDocuments(filter),
